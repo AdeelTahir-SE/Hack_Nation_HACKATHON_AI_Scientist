@@ -1,249 +1,36 @@
-# 🧪 AI Scientist — From Hypothesis to Runnable Experiment
-
-> **Fulcrum Science × MIT Challenge #04**  
-> An AI-powered tool that compresses weeks of experiment scoping into minutes — generating complete, operationally realistic experiment plans that a real lab could pick up and run.
-
----
-
-## The Problem
-
-Turning a scientific question into a runnable experiment takes weeks of manual work: designing the protocol, estimating costs, sourcing materials, staffing the team. It's not the ideas that slow science down — it's the operations.
-
-A senior scientist who's run a similar experiment before can scope a proposal in hours. One who hasn't may take days — and the quality difference is real. A plan with the wrong chemical concentration or an unrealistic timeline can send a lab down the wrong path for weeks.
-
-**AI Scientist closes this gap.**
-
----
-
-## What It Does
-
-A focused, end-to-end application with three stages:
-
-```
-Natural Language Question → Literature QC → Full Experiment Plan
-```
-
-### 1. Input
-Enter any scientific hypothesis in plain language. The system handles everything from diagnostics to climate science.
-
-### 2. Literature Quality Control
-Before generating a plan, the tool runs a fast novelty check:
-- **Not found** — you're breaking new ground
-- **Similar work exists** — builds on prior art with references
-- **Exact match found** — the protocol has been done before
-
-Returns 1–3 relevant references from arXiv, Semantic Scholar, or protocol repositories.
-
-### 3. Full Experiment Plan
-The core deliverable — a complete, operationally grounded plan including:
-
-| Section | What's Included |
-|---|---|
-| **Protocol** | Step-by-step methodology grounded in real published protocols |
-| **Materials & Supply Chain** | Specific reagents, catalog numbers, and suppliers |
-| **Budget** | Realistic cost estimates with itemized line items |
-| **Timeline** | Phased breakdown with dependencies |
-| **Validation** | How success or failure will be measured |
-
-**Quality bar:** Would a real scientist trust this plan enough to order materials and start running it by Friday?
-
----
-
-## Stretch Goal: Scientist Review Loop
-
-The system implements a learning feedback loop where every expert correction makes the next plan better:
-
-- **Structured review interface** — scientists rate, correct, and annotate protocol steps, reagent choices, budget lines, and timeline assumptions
-- **Feedback store** — corrections captured in structured form, tagged by experiment type and domain
-- **Generation layer** — prior feedback incorporated as few-shot examples when producing new plans of the same type
-
-The result: a system that compounds in value over time. Not just a tool — a platform.
-
----
-
-## Sample Inputs
-
-| Domain | Hypothesis |
-|---|---|
-| **Diagnostics** | A paper-based electrochemical biosensor functionalized with anti-CRP antibodies will detect C-reactive protein in whole blood at concentrations below 0.5 mg/L within 10 minutes |
-| **Gut Health** | Supplementing C57BL/6 mice with Lactobacillus rhamnosus GG for 4 weeks will reduce intestinal permeability by at least 30% compared to controls, measured by FITC-dextran assay |
-| **Cell Biology** | Replacing sucrose with trehalose as a cryoprotectant will increase post-thaw viability of HeLa cells by at least 15 percentage points compared to the standard DMSO protocol |
-| **Climate** | Introducing Sporomusa ovata into a bioelectrochemical system at −400mV vs SHE will fix CO₂ into acetate at ≥150 mmol/L/day, outperforming current biocatalytic carbon capture benchmarks by 20% |
-
-Strong hypotheses name a specific intervention, state a measurable outcome with a threshold, give a mechanistic reason, and imply a clear control condition.
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| **Frontend** | Next.js / React |
-| **Backend** | Node.js / Express |
-| **AI Generation** | Anthropic Claude API |
-| **Literature Search** | Semantic Scholar API, arXiv |
-| **Database** | Supabase (feedback store) |
-| **Deployment** | Vercel |
-
----
-
-## Project Structure
-
-```
-ai-scientist/
-├── app/                    # Next.js app directory
-│   ├── page.tsx            # Main input interface
-│   ├── results/            # Plan display & navigation
-│   └── review/             # Scientist review interface
-├── components/
-│   ├── HypothesisInput/    # Natural language input
-│   ├── LiteratureQC/       # Novelty signal display
-│   ├── ExperimentPlan/     # Full plan renderer
-│   │   ├── Protocol.tsx
-│   │   ├── Materials.tsx
-│   │   ├── Budget.tsx
-│   │   ├── Timeline.tsx
-│   │   └── Validation.tsx
-│   └── ScientistReview/    # Feedback & annotation UI
-├── lib/
-│   ├── claude.ts           # Anthropic API integration
-│   ├── literature.ts       # arXiv / Semantic Scholar search
-│   └── feedback.ts         # Feedback store logic
-├── api/
-│   ├── generate-plan/      # Main plan generation endpoint
-│   ├── literature-qc/      # Novelty check endpoint
-│   └── submit-review/      # Scientist feedback endpoint
-└── README.md
-```
-
----
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
 
-### Prerequisites
-- Node.js 18+
-- An [Anthropic API key](https://console.anthropic.com)
-- A [Supabase](https://supabase.com) project (for the feedback store)
-
-### Installation
-
-```bash
-git clone https://github.com/your-org/ai-scientist
-cd ai-scientist
-npm install
-```
-
-### Environment Variables
-
-```bash
-cp .env.example .env.local
-```
-
-```env
-ANTHROPIC_API_KEY=your_key_here
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SEMANTIC_SCHOLAR_API_KEY=your_key_here   # optional, increases rate limits
-```
-
-### Run Locally
+First, run the development server:
 
 ```bash
 npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
----
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-## How It Works
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-### Plan Generation Pipeline
+## Learn More
 
-```
-User hypothesis
-      │
-      ▼
-Literature QC (Semantic Scholar / arXiv)
-      │
-      ├── Novelty signal: not found / similar / exact match
-      └── 1–3 references surfaced
-      │
-      ▼
-Context assembly
-  - Hypothesis + novelty signal
-  - Relevant prior protocols (from literature hits)
-  - Domain-specific feedback from store (if similar experiments exist)
-      │
-      ▼
-Claude generation (structured prompt)
-      │
-      ▼
-Parsed experiment plan
-  - Protocol steps
-  - Materials with catalog numbers
-  - Budget line items
-  - Phased timeline
-  - Validation approach
-      │
-      ▼
-Rendered UI with section navigation
-```
+To learn more about Next.js, take a look at the following resources:
 
-### Feedback Loop (Stretch Goal)
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-```
-Scientist reviews generated plan
-      │
-      ▼
-Structured annotations stored in Supabase
-  - Experiment type tag
-  - Domain tag
-  - Section-level corrections
-      │
-      ▼
-Next similar experiment request
-      │
-      ▼
-Feedback retrieved as few-shot examples
-      │
-      ▼
-Improved generation — no re-prompting required
-```
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
----
+## Deploy on Vercel
 
-## Protocol Sources
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-The generation layer is grounded in real protocol repositories:
-
-- [protocols.io](https://protocols.io) — largest active repository
-- [Bio-protocol](https://bio-protocol.org) — peer-reviewed, linked to papers
-- [Nature Protocols](https://nature.com/nprot) — premium detail
-- [JoVE](https://jove.com) — video protocols with written transcripts
-- [OpenWetWare](https://openwetware.org) — community protocols
-
-Reagent references sourced from Thermo Fisher, Sigma-Aldrich, Promega, Qiagen, ATCC, and IDT.
-
----
-
-## Evaluation Criteria
-
-Plans are evaluated against the following standard:
-
-> **Would a real scientist trust this plan enough to order the materials and start running it?**
-
-Specifically:
-- Is the protocol grounded in real published methodology?
-- Do materials include actual catalog numbers and suppliers?
-- Is the budget realistic with itemized line items?
-- Does the timeline have phased dependencies, not just a total duration?
-- Is the validation approach measurable and experiment-specific?
-
----
-
-## Contact
-
-Built for the **Fulcrum Science × MIT Club Challenge #04**.
-
-Questions about the challenge: [arun@fulcrum.science](mailto:arun@fulcrum.science) / [jonas@fulcrum.science](mailto:jonas@fulcrum.science)
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
