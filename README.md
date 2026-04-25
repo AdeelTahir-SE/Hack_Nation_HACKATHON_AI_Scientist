@@ -17,9 +17,9 @@ AI Scientist closes this gap.
 
 ## What It Does
 
-A focused, end-to-end application with three stages:
+A focused, end-to-end application with four stages:
 
-Natural Language Question -> Literature QC -> Full Experiment Plan
+Natural Language Question -> Literature QC -> Retrieval Grounding -> Full Experiment Plan
 
 ### 1. Input
 Enter any scientific hypothesis in plain language. The system handles everything from diagnostics to climate science.
@@ -32,7 +32,14 @@ Before generating a plan, the tool runs a fast novelty check:
 
 Returns 1 to 3 relevant references from arXiv, Semantic Scholar, or protocol repositories.
 
-### 3. Full Experiment Plan
+### 3. Retrieval Grounding for Better Results
+To improve reliability and reduce hallucinations, generation is grounded with a retrieval layer:
+- Protocol snippets, reagent notes, and prior reviews are chunked and embedded
+- Embeddings are stored in a vector database (Supabase pgvector)
+- LangChain retrieves the most relevant context per hypothesis
+- Retrieved evidence is injected into the final generation prompt
+
+### 4. Full Experiment Plan
 The core deliverable is a complete, operationally grounded plan including:
 
 | Section | What is Included |
@@ -79,8 +86,10 @@ Strong hypotheses name a specific intervention, state a measurable outcome with 
 | Frontend | Next.js / React |
 | Backend | Next.js Route Handlers (app/api/*) |
 | AI Generation | Google Gemini API (free tier) |
+| LLM Orchestration | LangChain (JavaScript/TypeScript) |
 | Literature Search | Semantic Scholar API, arXiv |
-| Database | Supabase (feedback store) |
+| Vector Database | Supabase pgvector |
+| Application Database | Supabase (feedback store) |
 | Deployment | Vercel |
 
 ---
@@ -96,6 +105,7 @@ ai-scientist/
 |     |- generate-plan/route.ts          # Main plan generation endpoint
 |     |- literature-qc/route.ts          # Novelty check endpoint
 |     |- submit-review/route.ts          # Scientist feedback endpoint
+|     |- ingest-knowledge/route.ts       # Chunk and embed protocols into vector store
 |- components/
 |  |- HypothesisInput/                   # Natural language input
 |  |- LiteratureQC/                      # Novelty signal display
@@ -108,6 +118,8 @@ ai-scientist/
 |  |- ScientistReview/                   # Feedback and annotation UI
 |- lib/
 |  |- gemini.ts                          # Gemini API integration
+|  |- rag.ts                             # Retrieval pipeline with LangChain
+|  |- vectorstore.ts                     # Supabase pgvector client utilities
 |  |- literature.ts                      # arXiv and Semantic Scholar search
 |  |- feedback.ts                        # Feedback store logic
 |- README.md
@@ -119,7 +131,7 @@ ai-scientist/
 ### Prerequisites
 - Node.js 18+
 - A Google AI Studio API key for Gemini free tier: https://aistudio.google.com/app/apikey
-- A Supabase project for the feedback store: https://supabase.com
+- A Supabase project with pgvector enabled: https://supabase.com
 
 ### Installation
 
@@ -132,9 +144,13 @@ ai-scientist/
 Create a .env.local file with:
 
 GEMINI_API_KEY=your_key_here
+GOOGLE_API_KEY=your_key_here
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 SEMANTIC_SCHOLAR_API_KEY=your_key_here
+
+Note: GEMINI_API_KEY and GOOGLE_API_KEY can be the same value. Some LangChain integrations read GOOGLE_API_KEY by default.
 
 ### Run Locally
 
@@ -150,9 +166,14 @@ User hypothesis
 -> Literature QC (Semantic Scholar / arXiv)
 -> Novelty signal: not found / similar / exact match
 -> 1 to 3 references surfaced
+-> Retrieval grounding (LangChain + pgvector)
+   - Query embedding for hypothesis
+   - Similarity search over protocol chunks, reagent notes, and past reviewed plans
+   - Top-k evidence selection and context compression
 -> Context assembly
    - Hypothesis + novelty signal
    - Relevant prior protocols from literature hits
+   - Retrieved evidence from vector store
    - Domain-specific feedback from store if similar experiments exist
 -> Gemini generation with structured prompt
 -> Parsed experiment plan
@@ -162,6 +183,13 @@ User hypothesis
    - Phased timeline
    - Validation approach
 -> Rendered UI with section navigation
+
+### Why This Improves Results
+
+- More factual grounding from retrieved experimental evidence
+- Better reagent and protocol specificity across domains
+- Lower hallucination rate in budget and timeline details
+- Higher consistency across repeated prompts for similar hypotheses
 
 ### Feedback Loop (Stretch Goal)
 
