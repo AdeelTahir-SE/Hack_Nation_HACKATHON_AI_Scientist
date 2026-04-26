@@ -1,7 +1,7 @@
 # AI Scientist — System Architecture
 
 > End-to-end architecture for a hypothesis-to-experiment-plan AI platform.
-> Built on Next.js, Ollama (local LLM), LangChain RAG, and live literature APIs.
+> Built on Next.js, Ollama (local LLM), custom in-process RAG, and live literature APIs.
 
 ---
 
@@ -24,7 +24,7 @@ graph TB
     subgraph LIBS["📚  Core Libraries  (src/lib/)"]
         direction TB
         LIT["literature.ts\narXiv · OpenAlex · Crossref"]
-        RAG["rag.ts\nLangChain retrieval"]
+        RAG["rag.ts\nCustom in-process retrieval"]
         VS["vectorstore.ts\nIn-memory vector index"]
         GEN["gemini.ts\nOllama client + prompt builder"]
         FB["feedback.ts\nSupabase review store"]

@@ -35,8 +35,8 @@ Returns 1 to 3 relevant references from arXiv, OpenAlex, Crossref, or protocol r
 ### 3. Retrieval Grounding for Better Results
 To improve reliability and reduce hallucinations, generation is grounded with a retrieval layer:
 - Protocol snippets, reagent notes, and prior reviews are chunked and embedded
-- Embeddings are stored in an in-app vector memory layer
-- LangChain retrieves the most relevant context per hypothesis
+- Embeddings are stored in an in-app vector memory layer (256-dim hash vectors, cosine similarity)
+- Custom retrieval pipeline selects the most relevant context per hypothesis
 - Retrieved evidence is injected into the final generation prompt
 
 ### 4. Full Experiment Plan
@@ -86,7 +86,7 @@ Strong hypotheses name a specific intervention, state a measurable outcome with 
 | Frontend | Next.js 16 / React 19 |
 | Backend | Next.js Route Handlers (app/api/*) |
 | AI Generation | Ollama (local, self-hosted LLM — Qwen / any compatible model) |
-| LLM Orchestration | LangChain (JavaScript/TypeScript) |
+| LLM Orchestration | Custom prompt builder (`gemini.ts`) — direct `ollama` npm client |
 | Literature Search | arXiv API, OpenAlex API, Crossref API |
 | Vector Store | In-memory retrieval index (hash embedding, cosine similarity) |
 | Feedback Store | **Supabase** (PostgreSQL — persistent across restarts) |
@@ -110,7 +110,7 @@ ai-scientist/  (src/ layout)
 |  |     |- ingest-knowledge/route.ts        # Chunk and embed protocols into vector store
 |  |- lib/
 |  |  |- gemini.ts                           # Ollama client + prompt builder + JSON normalizers
-|  |  |- rag.ts                              # LangChain-style retrieval pipeline
+|  |  |- rag.ts                              # Custom retrieval pipeline (in-process RAG)
 |  |  |- vectorstore.ts                      # In-memory hash embedding + cosine similarity
 |  |  |- literature.ts                       # arXiv, OpenAlex, and Crossref search
 |  |  |- feedback.ts                         # Supabase-backed review store
@@ -228,7 +228,7 @@ User hypothesis
 -> Literature QC (arXiv / OpenAlex / Crossref)
 -> Novelty signal: not found / similar / exact match
 -> 1 to 3 references surfaced
--> Retrieval grounding (LangChain + in-app vector index)
+-> Retrieval grounding (custom RAG + in-app vector index)
    - Query embedding for hypothesis
    - Similarity search over protocol chunks, reagent notes, and past reviewed plans
    - Top-k evidence selection and context compression

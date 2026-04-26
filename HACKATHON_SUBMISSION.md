@@ -24,7 +24,7 @@
 
 ## Short Description
 
-An AI-powered research tool that transforms a plain-language scientific hypothesis into a complete, operationally grounded experiment plan — covering step-by-step protocol, materials with catalog numbers, budget line items, phased timeline, and measurable validation criteria — in minutes instead of weeks. Powered by Ollama (local LLM), LangChain RAG, and real-time literature search across arXiv, OpenAlex, and Crossref.
+An AI-powered research tool that transforms a plain-language scientific hypothesis into a complete, operationally grounded experiment plan — covering step-by-step protocol, materials with catalog numbers, budget line items, phased timeline, and measurable validation criteria — in minutes instead of weeks. Powered by Ollama (local LLM), a custom in-process RAG pipeline, and real-time literature search across arXiv, OpenAlex, and Crossref.
 
 ---
 
@@ -62,7 +62,7 @@ Before generating a plan, a fast novelty check is performed against arXiv, OpenA
 - *Exact match* — the protocol already exists; the plan extends it
 
 **Feature 2 — Retrieval-Augmented Generation (RAG)**
-Protocol snippets, reagent notes, and prior reviews are chunked and embedded into an in-app vector index. LangChain retrieves the top-k most relevant evidence per hypothesis and injects it into the generation prompt, grounding outputs in real methodology rather than hallucinated steps.
+Protocol snippets, reagent notes, and prior reviews are chunked and embedded into an in-app vector index (256-dim hash vectors, cosine similarity — pure TypeScript, zero external dependencies). A custom retrieval pipeline selects the top-k most relevant evidence per hypothesis and injects it into the generation prompt, grounding outputs in real methodology rather than hallucinated steps.
 
 **Feature 3 — Structured Experiment Plan**
 The core deliverable is a complete, operationally realistic plan with five sections:
@@ -98,9 +98,9 @@ The application is a pure Next.js project (no separate backend server). All API 
 - *Model:* Any Ollama-compatible model (default: `qwen2.5:7b`, configurable via `OLLAMA_MODEL` env var)
 - *Integration:* `src/lib/gemini.ts` wraps the Ollama client, builds structured prompts with a strict JSON schema, handles multi-attempt retry with increasing strictness, and applies five normalizers to handle any model output shape variation
 
-**RAG Pipeline — LangChain**
+**RAG Pipeline — Custom in-process implementation**
 - `src/lib/rag.ts` orchestrates query embedding, similarity search, and context compression
-- `src/lib/vectorstore.ts` manages an in-memory vector index (upgradeable to Pinecone or pgvector)
+- `src/lib/vectorstore.ts` manages an in-memory vector index with 256-dim hash embeddings and cosine similarity (pure TypeScript, no external dependencies — upgradeable to Pinecone or pgvector)
 - Retrieved evidence is injected into the generation prompt as numbered context blocks
 
 **Literature Search**
@@ -275,7 +275,7 @@ The feedback loop requires zero retraining, zero model updates, and zero user re
 
 ## Technologies / Tags
 
-`Next.js` · `React` · `TypeScript` · `Ollama` · `LangChain` · `RAG` · `LLM` · `Tailwind CSS` · `arXiv API` · `OpenAlex` · `Crossref` · `Vector Store` · `Qwen`
+`Next.js` · `React` · `TypeScript` · `Ollama` · `RAG` · `LLM` · `Tailwind CSS` · `arXiv API` · `OpenAlex` · `Crossref` · `Vector Store` · `Supabase` · `Qwen`
 
 ## Additional Tags
 
@@ -289,7 +289,7 @@ The feedback loop requires zero retraining, zero model updates, and zero user re
 |---|---|---|
 | Team Photo | ⬜ To upload | Landscape, 16:9, good lighting, all faces visible |
 | Demo Video (max 60s) | ⬜ To record | UI/UX showcase — hypothesis input → plan output flow |
-| Tech Video (max 60s) | ⬜ To record | Stack walkthrough — Ollama, LangChain RAG, literature QC, review loop |
+| Tech Video (max 60s) | ⬜ To record | Stack walkthrough — Ollama, custom RAG pipeline, literature QC, review loop |
 | Screenshots / Diagrams | ⬜ To add | Input page, results page (all 5 sections), literature QC panel |
 
 > ⚠️ **Both Demo Video and Tech Video are required by the jury.** Projects missing either video may score lower. Record these before final submission.
@@ -299,7 +299,7 @@ The feedback loop requires zero retraining, zero model updates, and zero user re
 2. **(5–15s)** Submit — show the literature QC panel loading and displaying novelty signal + references
 3. **(15–35s)** Scroll through the generated plan: Protocol steps → Materials table → Budget → Timeline → Validation
 4. **(35–50s)** Open the Scientist Review section; show the rating and annotation UI
-5. **(50–60s)** Quick summary: "Local Ollama + LangChain RAG → full experiment plan in under 60 seconds"
+5. **(50–60s)** Quick summary: "Local Ollama + custom RAG pipeline → full experiment plan in under 60 seconds"
 
 ### Tech Video Script Outline (60s)
 1. **(0–10s)** Architecture overview: Next.js frontend, `/api/` route handlers, Ollama local LLM, Supabase review store
