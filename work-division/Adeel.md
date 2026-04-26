@@ -20,7 +20,7 @@
 ## Deliverables
 - Working generation API route with structured output.
 - Shared plan response contract used by frontend.
-- Working RAG path with LangChain retrieval from Supabase pgvector.
+- Working RAG path with LangChain retrieval from the in-app vector index.
 - Integration checklist completion before final submission.
 
 ## Coordination

@@ -1,18 +1,18 @@
-# Moazzam - Scientist Review Loop and Feedback Store
+# Moazzam - Scientist Review Loop and Retrieval Store
 
 ## Core Responsibilities
-- Design feedback data model in Supabase (experiment type, domain, section corrections).
-- Design vector storage schema in Supabase pgvector (documents, chunks, embeddings, metadata).
+- Design feedback data model in app memory (experiment type, domain, section corrections).
+- Design vector storage schema for in-app retrieval store (documents, chunks, embeddings, metadata).
 - Implement `app/api/submit-review/route.ts` endpoint.
 - Build review interface components for rating and section-level annotations.
 - Implement retrieval utility to fetch relevant historical feedback for similar experiments.
-- Maintain SQL migration scripts for vector index setup and metadata filters.
+- Maintain retrieval indexing and metadata filtering logic.
 
 ## Deliverables
 - Functional review submission flow.
-- Supabase table schema and insertion/query logic.
+- In-app schema and insertion/query logic.
 - Reusable feedback retrieval helper for generation context.
-- pgvector-ready schema and query templates for similarity search.
+- Retrieval-ready schema and query templates for similarity search.
 
 ## Coordination
 - Share stored feedback format with Adeel for few-shot context integration.

@@ -14,7 +14,7 @@ type PlanMaterial = {
   item: string;
   catalog: string;
   supplier: string;
-  estimatedCostUSD: number;
+  estimatedCostUSD: number | null;
 };
 
 type PlanBudget = {
@@ -51,6 +51,14 @@ const generationSteps = [
   "Finalizing output...",
 ];
 
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
 export default function Home() {
   const [hypothesis, setHypothesis] = useState(SAMPLE);
   const [loading, setLoading] = useState(false);
@@ -67,6 +75,17 @@ export default function Home() {
     if (plan.novelty === "exact") return "Exact match found";
     if (plan.novelty === "similar") return "Similar prior work";
     return "Novel direction";
+  }, [plan]);
+
+  const priorWorkMessage = useMemo(() => {
+    if (!plan) return "";
+    if (plan.novelty === "exact") {
+      return "This work appears to be already done with closely matching results. Reproduce or extend it with a meaningful variation.";
+    }
+    if (plan.novelty === "similar") {
+      return "Related work already exists. Continue by improving controls, conditions, or outcome targets.";
+    }
+    return "No strong prior match found. Continue with the proposed experiment plan.";
   }, [plan]);
 
   async function generatePlan() {
@@ -198,6 +217,10 @@ export default function Home() {
             <section className="card">
               <h2>2. Literature QC</h2>
               <p className="pill">{noveltyLabel}</p>
+              <div className="status-box">
+                <strong>Decision</strong>
+                <p>{priorWorkMessage}</p>
+              </div>
               <ul className="list">
                 {plan.references.map((ref) => (
                   <li key={ref.url}>
@@ -251,7 +274,11 @@ export default function Home() {
                         <td>{material.item}</td>
                         <td>{material.catalog}</td>
                         <td>{material.supplier}</td>
-                        <td>{material.estimatedCostUSD.toFixed(2)}</td>
+                        <td>
+                          {typeof material.estimatedCostUSD === "number"
+                            ? formatCurrency(material.estimatedCostUSD)
+                            : "N/A"}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -263,9 +290,11 @@ export default function Home() {
                 {plan.budget.map((line) => (
                   <li key={`${line.category}-${line.notes}`}>
                     <span>
-                      <strong>{line.category}:</strong> ${line.amountUSD.toFixed(2)}
+                      <strong>{line.category}:</strong> {formatCurrency(line.amountUSD)}
                     </span>
-                    <span>{line.notes}</span>
+                    <span>
+                      <strong>Notes:</strong> {line.notes || "N/A"}
+                    </span>
                   </li>
                 ))}
               </ul>

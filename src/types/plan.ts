@@ -11,7 +11,7 @@ export type PlanMaterial = {
   item: string;
   catalog: string;
   supplier: string;
-  estimatedCostUSD: number;
+  estimatedCostUSD: number | null;
 };
 
 export type PlanBudgetLine = {

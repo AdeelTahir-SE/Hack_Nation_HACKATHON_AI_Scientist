@@ -35,7 +35,7 @@ Returns 1 to 3 relevant references from arXiv, OpenAlex, Crossref, or protocol r
 ### 3. Retrieval Grounding for Better Results
 To improve reliability and reduce hallucinations, generation is grounded with a retrieval layer:
 - Protocol snippets, reagent notes, and prior reviews are chunked and embedded
-- Embeddings are stored in a vector database (Supabase pgvector)
+- Embeddings are stored in an in-app vector memory layer
 - LangChain retrieves the most relevant context per hypothesis
 - Retrieved evidence is injected into the final generation prompt
 
@@ -85,11 +85,11 @@ Strong hypotheses name a specific intervention, state a measurable outcome with 
 |---|---|
 | Frontend | Next.js / React |
 | Backend | Next.js Route Handlers (app/api/*) |
-| AI Generation | Google Gemini API (free tier) |
+| AI Generation | Ollama Cloud (Qwen) |
 | LLM Orchestration | LangChain (JavaScript/TypeScript) |
 | Literature Search | arXiv API, OpenAlex API, Crossref API |
-| Vector Database | Supabase pgvector |
-| Application Database | Supabase (feedback store) |
+| Vector Store | In-memory retrieval index (upgradeable) |
+| Feedback Store | In-memory review store (upgradeable) |
 | Deployment | Vercel |
 
 ---
@@ -117,9 +117,9 @@ ai-scientist/
 |  |  |- Validation.tsx
 |  |- ScientistReview/                   # Feedback and annotation UI
 |- lib/
-|  |- gemini.ts                          # Gemini API integration
+|  |- gemini.ts                          # Ollama Cloud (Qwen) integration
 |  |- rag.ts                             # Retrieval pipeline with LangChain
-|  |- vectorstore.ts                     # Supabase pgvector client utilities
+|  |- vectorstore.ts                     # In-memory vector retrieval utilities
 |  |- literature.ts                      # arXiv, OpenAlex, and Crossref search
 |  |- feedback.ts                        # Feedback store logic
 |- README.md
@@ -130,8 +130,7 @@ ai-scientist/
 
 ### Prerequisites
 - Node.js 18+
-- A free Google AI Studio API key for Gemini: https://aistudio.google.com/app/apikey
-- A Supabase project with pgvector enabled: https://supabase.com
+- An Ollama Cloud API key
 
 ### Installation
 
@@ -143,18 +142,24 @@ ai-scientist/
 
 Create a .env.local file with:
 
-GEMINI_API_KEY=your_key_here
-GOOGLE_API_KEY=your_key_here
-GEMINI_MODEL=gemini-2.0-flash
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+OLLAMA_API_KEY=your_ollama_cloud_api_key_here
+OLLAMA_MODEL=gpt-oss:120b
+OLLAMA_BASE_URL=https://ollama.com
 ARXIV_BASE_URL=https://export.arxiv.org/api/query
 OPENALEX_BASE_URL=https://api.openalex.org
 CROSSREF_BASE_URL=https://api.crossref.org
 
-Note: GEMINI_API_KEY and GOOGLE_API_KEY can be the same value. Some LangChain integrations read GOOGLE_API_KEY by default.
-For the free-key setup, keep GEMINI_MODEL on a flash model such as gemini-2.0-flash.
+Note: `OLLAMA_MODEL=gpt-oss:120b` matches the current setup. Keep `OLLAMA_BASE_URL=https://ollama.com` for Ollama Cloud SDK usage.
+
+### Ollama Cloud Quick Check
+
+Set your key in shell:
+
+`export OLLAMA_API_KEY=your_api_key`
+
+List available models directly from Ollama API:
+
+`curl https://ollama.com/api/tags`
 
 ### Run Locally
 
@@ -170,7 +175,7 @@ User hypothesis
 -> Literature QC (arXiv / OpenAlex / Crossref)
 -> Novelty signal: not found / similar / exact match
 -> 1 to 3 references surfaced
--> Retrieval grounding (LangChain + pgvector)
+-> Retrieval grounding (LangChain + in-app vector index)
    - Query embedding for hypothesis
    - Similarity search over protocol chunks, reagent notes, and past reviewed plans
    - Top-k evidence selection and context compression
@@ -179,7 +184,7 @@ User hypothesis
    - Relevant prior protocols from literature hits
    - Retrieved evidence from vector store
    - Domain-specific feedback from store if similar experiments exist
--> Gemini generation with structured prompt
+-> Ollama generation with structured prompt
 -> Parsed experiment plan
    - Protocol steps
    - Materials with catalog numbers
@@ -198,7 +203,7 @@ User hypothesis
 ### Feedback Loop (Stretch Goal)
 
 Scientist reviews generated plan
--> Structured annotations stored in Supabase
+-> Structured annotations stored in in-app review memory
    - Experiment type tag
    - Domain tag
    - Section-level corrections
