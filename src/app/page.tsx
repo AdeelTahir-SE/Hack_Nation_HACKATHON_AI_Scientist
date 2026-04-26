@@ -138,8 +138,25 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<PlanResponse | null>(null);
   const [activeTab, setActiveTab] = useState<PlanTab>("protocol");
-
   const [currentStep, setCurrentStep] = useState<number | null>(null);
+
+  // ── Scientist Review state ────────────────────────────────────
+  const [reviewScore, setReviewScore] = useState<number>(0);
+  const [reviewHover, setReviewHover] = useState<number>(0);
+  const [reviewComments, setReviewComments] = useState("");
+  const [reviewProtocol, setReviewProtocol] = useState("");
+  const [reviewMaterials, setReviewMaterials] = useState("");
+  const [reviewBudget, setReviewBudget] = useState("");
+  const [reviewTimeline, setReviewTimeline] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewDone, setReviewDone] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+
+  function resetReview() {
+    setReviewScore(0); setReviewHover(0); setReviewComments("");
+    setReviewProtocol(""); setReviewMaterials(""); setReviewBudget(""); setReviewTimeline("");
+    setReviewDone(false); setReviewError(null);
+  }
 
   const noveltyMeta = useMemo(() => {
     if (!plan) return null;
@@ -168,11 +185,38 @@ export default function Home() {
     };
   }, [plan]);
 
+  async function submitReview() {
+    if (!plan || reviewScore === 0) return;
+    setReviewSubmitting(true);
+    setReviewError(null);
+    const sectionNotes = [
+      reviewProtocol && `Protocol: ${reviewProtocol}`,
+      reviewMaterials && `Materials: ${reviewMaterials}`,
+      reviewBudget && `Budget: ${reviewBudget}`,
+      reviewTimeline && `Timeline: ${reviewTimeline}`,
+    ].filter(Boolean).join(" | ");
+    const fullComment = [reviewComments, sectionNotes].filter(Boolean).join(" — ");
+    try {
+      const res = await fetch("/api/submit-review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hypothesis: plan.hypothesis, score: reviewScore, comments: fullComment }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Submission failed");
+      setReviewDone(true);
+    } catch (err) {
+      setReviewError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setReviewSubmitting(false);
+    }
+  }
+
   async function generatePlan() {
     setError(null);
     setLoading(true);
     setPlan(null);
     setCurrentStep(0);
+    resetReview();
 
     try {
       const literatureRes = await fetch("/api/literature-qc", {
@@ -632,6 +676,119 @@ export default function Home() {
                     ))}
                   </div>
                 </div>
+              )}
+            </section>
+
+            {/* ── Step 5: Scientist Review Loop ── */}
+            <section className="card" id="scientist-review" style={{ borderColor: "rgba(251,191,36,0.25)", background: "linear-gradient(135deg,rgba(251,191,36,0.04) 0%,rgba(16,16,20,0) 60%)" }}>
+              <div className="section-label">
+                <div className="section-num" style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)" }}>5</div>
+                <h2>Scientist Review Loop</h2>
+              </div>
+              <p style={{ fontSize: "0.88rem", color: "var(--text-muted)", marginBottom: "1.5rem", lineHeight: 1.6 }}>
+                Rate and annotate this plan. Your corrections are stored as structured feedback and become
+                few-shot examples for the next similar experiment — making every subsequent plan measurably better.
+              </p>
+
+              {reviewDone ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.75rem", padding: "2rem", textAlign: "center", background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.25)", borderRadius: "12px" }}>
+                  <span style={{ fontSize: "2.5rem" }}>✅</span>
+                  <div style={{ fontWeight: 700, fontSize: "1.1rem", color: "#10b981" }}>Feedback Stored</div>
+                  <p style={{ fontSize: "0.86rem", color: "var(--text-muted)", maxWidth: "380px" }}>
+                    Your {reviewScore}/5 rating and corrections have been saved. The next plan generated
+                    for a similar hypothesis will automatically reflect your expert corrections.
+                  </p>
+                  <button className="btn-secondary" style={{ marginTop: "0.5rem" }} onClick={resetReview}>Leave another review</button>
+                </div>
+              ) : (
+                <>
+                  {/* Star rating */}
+                  <div style={{ marginBottom: "1.5rem" }}>
+                    <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.6rem" }}>Overall Plan Quality</div>
+                    <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+                      {[1,2,3,4,5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          id={`review-star-${star}`}
+                          aria-label={`Rate ${star} out of 5`}
+                          onClick={() => setReviewScore(star)}
+                          onMouseEnter={() => setReviewHover(star)}
+                          onMouseLeave={() => setReviewHover(0)}
+                          style={{
+                            background: "none", border: "none", cursor: "pointer", padding: "2px",
+                            fontSize: "1.8rem", lineHeight: 1,
+                            color: star <= (reviewHover || reviewScore) ? "#f59e0b" : "rgba(255,255,255,0.15)",
+                            transition: "color 0.15s, transform 0.1s",
+                            transform: star <= (reviewHover || reviewScore) ? "scale(1.15)" : "scale(1)",
+                          }}
+                        >★</button>
+                      ))}
+                      {reviewScore > 0 && (
+                        <span style={{ marginLeft: "0.5rem", fontSize: "0.85rem", color: "#f59e0b", fontWeight: 600 }}>
+                          {["" ,"Needs major work","Below expectations","Acceptable","Good plan","Excellent — ready to run"][reviewScore]}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Section-level corrections */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+                    {([
+                      { key: "protocol", label: "🔬 Protocol corrections", value: reviewProtocol, set: setReviewProtocol, placeholder: "e.g. Step 4 centrifuge speed should be 400×g not 300×g" },
+                      { key: "materials", label: "🧫 Materials corrections", value: reviewMaterials, set: setReviewMaterials, placeholder: "e.g. Prefer Sigma T9531 over generic trehalose; add 10% glycerol" },
+                      { key: "budget", label: "💰 Budget corrections", value: reviewBudget, set: setReviewBudget, placeholder: "e.g. Cell line cost should be ~$450, not $200; add sequencing line" },
+                      { key: "timeline", label: "📅 Timeline corrections", value: reviewTimeline, set: setReviewTimeline, placeholder: "e.g. Recovery phase needs 72h minimum, not 24h" },
+                    ] as const).map(({ key, label, value, set, placeholder }) => (
+                      <div key={key}>
+                        <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 600, color: "var(--text-muted)", marginBottom: "0.4rem", textTransform: "uppercase", letterSpacing: "0.07em" }}>{label}</label>
+                        <textarea
+                          id={`review-${key}`}
+                          value={value}
+                          onChange={(e) => set(e.target.value)}
+                          placeholder={placeholder}
+                          rows={2}
+                          style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)", borderRadius: "8px", padding: "0.6rem 0.75rem", color: "var(--text-primary)", fontSize: "0.84rem", resize: "vertical", fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* General comments */}
+                  <div style={{ marginBottom: "1.25rem" }}>
+                    <label htmlFor="review-comments" style={{ display: "block", fontSize: "0.78rem", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "0.4rem" }}>General comments</label>
+                    <textarea
+                      id="review-comments"
+                      value={reviewComments}
+                      onChange={(e) => setReviewComments(e.target.value)}
+                      placeholder="Overall notes, domain-specific concerns, or suggestions for improvement…"
+                      rows={3}
+                      style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)", borderRadius: "8px", padding: "0.7rem 0.85rem", color: "var(--text-primary)", fontSize: "0.86rem", resize: "vertical", fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+                    />
+                  </div>
+
+                  {reviewError && (
+                    <div className="error-box" style={{ marginBottom: "1rem" }}>
+                      <AlertIcon /><span>{reviewError}</span>
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                    <button
+                      id="submit-review-btn"
+                      className="btn-primary"
+                      onClick={submitReview}
+                      disabled={reviewSubmitting || reviewScore === 0}
+                      style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)", boxShadow: "0 4px 20px rgba(245,158,11,0.25)" }}
+                    >
+                      <span>⚡</span>
+                      <span>{reviewSubmitting ? "Storing feedback…" : "Submit Review"}</span>
+                    </button>
+                    <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                      {reviewScore === 0 ? "Select a star rating to enable submission" : "Your corrections will improve the next similar plan"}
+                    </span>
+                  </div>
+                </>
               )}
             </section>
 
