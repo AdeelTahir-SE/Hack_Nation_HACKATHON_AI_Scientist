@@ -17,9 +17,9 @@ AI Scientist closes this gap.
 
 ## What It Does
 
-A focused, end-to-end application with four stages:
+A focused, end-to-end application with five stages:
 
-Natural Language Question -> Literature QC -> Retrieval Grounding -> Full Experiment Plan
+Natural Language Question -> Literature QC -> Retrieval Grounding -> Full Experiment Plan -> Scientist Review Loop
 
 ### 1. Input
 Enter any scientific hypothesis in plain language. The system handles everything from diagnostics to climate science.
@@ -83,13 +83,13 @@ Strong hypotheses name a specific intervention, state a measurable outcome with 
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js / React |
+| Frontend | Next.js 16 / React 19 |
 | Backend | Next.js Route Handlers (app/api/*) |
 | AI Generation | Ollama (local, self-hosted LLM — Qwen / any compatible model) |
 | LLM Orchestration | LangChain (JavaScript/TypeScript) |
 | Literature Search | arXiv API, OpenAlex API, Crossref API |
-| Vector Store | In-memory retrieval index (upgradeable) |
-| Feedback Store | In-memory review store (upgradeable) |
+| Vector Store | In-memory retrieval index (hash embedding, cosine similarity) |
+| Feedback Store | **Supabase** (PostgreSQL — persistent across restarts) |
 | Deployment | Vercel / Local |
 
 ---
@@ -97,32 +97,27 @@ Strong hypotheses name a specific intervention, state a measurable outcome with 
 ## Project Structure
 
 ```
-ai-scientist/
-|- app/                                  # Next.js app directory
-|  |- page.tsx                           # Main input interface
-|  |- results/                           # Plan display and navigation
-|  |- review/                            # Scientist review interface
-|  |- api/
-|     |- generate-plan/route.ts          # Main plan generation endpoint
-|     |- literature-qc/route.ts          # Novelty check endpoint
-|     |- submit-review/route.ts          # Scientist feedback endpoint
-|     |- ingest-knowledge/route.ts       # Chunk and embed protocols into vector store
-|- components/
-|  |- HypothesisInput/                   # Natural language input
-|  |- LiteratureQC/                      # Novelty signal display
-|  |- ExperimentPlan/                    # Full plan renderer
-|  |  |- Protocol.tsx
-|  |  |- Materials.tsx
-|  |  |- Budget.tsx
-|  |  |- Timeline.tsx
-|  |  |- Validation.tsx
-|  |- ScientistReview/                   # Feedback and annotation UI
-|- lib/
-|  |- gemini.ts                          # Ollama integration and generation logic
-|  |- rag.ts                             # Retrieval pipeline with LangChain
-|  |- vectorstore.ts                     # In-memory vector retrieval utilities
-|  |- literature.ts                      # arXiv, OpenAlex, and Crossref search
-|  |- feedback.ts                        # Feedback store logic
+ai-scientist/  (src/ layout)
+|- src/
+|  |- app/
+|  |  |- page.tsx                           # All UI: input, results, review loop (single page)
+|  |  |- layout.tsx                          # Root layout + metadata
+|  |  |- globals.css                         # Design system tokens + component styles
+|  |  |- api/
+|  |     |- generate-plan/route.ts           # Main plan generation endpoint
+|  |     |- literature-qc/route.ts           # Novelty check endpoint
+|  |     |- submit-review/route.ts           # Scientist feedback → Supabase
+|  |     |- ingest-knowledge/route.ts        # Chunk and embed protocols into vector store
+|  |- lib/
+|  |  |- gemini.ts                           # Ollama client + prompt builder + JSON normalizers
+|  |  |- rag.ts                              # LangChain-style retrieval pipeline
+|  |  |- vectorstore.ts                      # In-memory hash embedding + cosine similarity
+|  |  |- literature.ts                       # arXiv, OpenAlex, and Crossref search
+|  |  |- feedback.ts                         # Supabase-backed review store
+|  |  |- supabase.ts                         # Lazy singleton Supabase client
+|  |- types/
+|     |- plan.ts                             # Shared TypeScript types
+|- supabase_setup.sql                        # SQL to run in Supabase SQL Editor
 |- README.md
 ```
 
@@ -257,15 +252,17 @@ User hypothesis
 ### Feedback Loop (Stretch Goal)
 
 ```
-Scientist reviews generated plan
--> Structured annotations stored in in-app review memory
-   - Experiment type tag
-   - Domain tag
-   - Section-level corrections
+Scientist reviews generated plan (Section 5 — Review Loop UI)
+-> Star rating (1–5) + per-section correction textareas
+-> Structured annotations saved to Supabase reviews table
+   - hypothesis, score, merged section corrections, timestamp
 -> Next similar experiment request
--> Feedback retrieved as few-shot examples
--> Improved generation with no re-prompting required
+-> Feedback retrieved from Supabase (keyword token match)
+-> Injected as few-shot examples into Ollama generation prompt
+-> Improved plan generated with no re-prompting required
 ```
+
+> Reviews persist across server restarts and deployments — every correction permanently improves future plans.
 
 ---
 
