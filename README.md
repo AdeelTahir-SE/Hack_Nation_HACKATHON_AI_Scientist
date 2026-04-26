@@ -85,17 +85,18 @@ Strong hypotheses name a specific intervention, state a measurable outcome with 
 |---|---|
 | Frontend | Next.js / React |
 | Backend | Next.js Route Handlers (app/api/*) |
-| AI Generation | Ollama Cloud (Qwen) |
+| AI Generation | Ollama (local, self-hosted LLM — Qwen / any compatible model) |
 | LLM Orchestration | LangChain (JavaScript/TypeScript) |
 | Literature Search | arXiv API, OpenAlex API, Crossref API |
 | Vector Store | In-memory retrieval index (upgradeable) |
 | Feedback Store | In-memory review store (upgradeable) |
-| Deployment | Vercel |
+| Deployment | Vercel / Local |
 
 ---
 
 ## Project Structure
 
+```
 ai-scientist/
 |- app/                                  # Next.js app directory
 |  |- page.tsx                           # Main input interface
@@ -117,12 +118,13 @@ ai-scientist/
 |  |  |- Validation.tsx
 |  |- ScientistReview/                   # Feedback and annotation UI
 |- lib/
-|  |- gemini.ts                          # Ollama Cloud (Qwen) integration
+|  |- gemini.ts                          # Ollama integration and generation logic
 |  |- rag.ts                             # Retrieval pipeline with LangChain
 |  |- vectorstore.ts                     # In-memory vector retrieval utilities
 |  |- literature.ts                      # arXiv, OpenAlex, and Crossref search
 |  |- feedback.ts                        # Feedback store logic
 |- README.md
+```
 
 ---
 
@@ -130,40 +132,63 @@ ai-scientist/
 
 ### Prerequisites
 - Node.js 18+
-- An Ollama Cloud API key
+- [Ollama](https://ollama.com) installed and running locally (`ollama serve`)
+- A compatible model pulled locally, e.g. `ollama pull qwen2.5:7b`
 
 ### Installation
 
-1. Clone your repository.
+1. Clone the repository.
 2. Enter the project folder.
-3. Install dependencies with npm install.
+3. Install dependencies:
+
+```bash
+npm install
+```
 
 ### Environment Variables
 
-Create a .env.local file with:
+Create a `.env.local` file in the project root:
 
-OLLAMA_API_KEY=your_ollama_cloud_api_key_here
-OLLAMA_MODEL=gpt-oss:120b
-OLLAMA_BASE_URL=https://ollama.com
+```env
+# Ollama — local server (no API key required for local use)
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen2.5:7b
+
+# Literature search APIs (no key required for public access)
 ARXIV_BASE_URL=https://export.arxiv.org/api/query
 OPENALEX_BASE_URL=https://api.openalex.org
 CROSSREF_BASE_URL=https://api.crossref.org
+```
 
-Note: `OLLAMA_MODEL=gpt-oss:120b` matches the current setup. Keep `OLLAMA_BASE_URL=https://ollama.com` for Ollama Cloud SDK usage.
+> **Note:** `OLLAMA_API_KEY` is only needed if you are using Ollama Cloud (remote hosted). For local Ollama, leave it unset or omit it entirely. Set `OLLAMA_BASE_URL=http://localhost:11434` to point at your local Ollama server.
 
-### Ollama Cloud Quick Check
+### Ollama Quick Check
 
-Set your key in shell:
+Make sure Ollama is running:
 
-`export OLLAMA_API_KEY=your_api_key`
+```bash
+ollama serve
+```
 
-List available models directly from Ollama API:
+Verify the server is responding:
 
-`curl https://ollama.com/api/tags`
+```bash
+curl http://localhost:11434/api/tags
+```
+
+Pull the model used by the app (if not already done):
+
+```bash
+ollama pull qwen2.5:7b
+```
 
 ### Run Locally
 
-Start development server with npm run dev and open http://localhost:3000
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
@@ -171,6 +196,7 @@ Start development server with npm run dev and open http://localhost:3000
 
 ### Plan Generation Pipeline
 
+```
 User hypothesis
 -> Literature QC (arXiv / OpenAlex / Crossref)
 -> Novelty signal: not found / similar / exact match
@@ -192,6 +218,7 @@ User hypothesis
    - Phased timeline
    - Validation approach
 -> Rendered UI with section navigation
+```
 
 ### Why This Improves Results
 
@@ -202,6 +229,7 @@ User hypothesis
 
 ### Feedback Loop (Stretch Goal)
 
+```
 Scientist reviews generated plan
 -> Structured annotations stored in in-app review memory
    - Experiment type tag
@@ -210,6 +238,7 @@ Scientist reviews generated plan
 -> Next similar experiment request
 -> Feedback retrieved as few-shot examples
 -> Improved generation with no re-prompting required
+```
 
 ---
 

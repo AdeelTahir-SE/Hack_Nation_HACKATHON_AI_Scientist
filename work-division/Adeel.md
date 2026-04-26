@@ -3,7 +3,7 @@
 ## Core Responsibilities
 - Design the overall Next.js-only architecture (no separate Express backend).
 - Implement `app/api/generate-plan/route.ts` endpoint.
-- Integrate Gemini 3 and create `lib/gemini.ts` prompt + response parsing logic.
+- Integrate Ollama (local/self-hosted) and create `lib/gemini.ts` prompt + response parsing logic.
 - Implement LangChain orchestration layer for prompt chaining and retrieval-augmented generation.
 - Build `lib/rag.ts` to retrieve top-k evidence from vector store and compress context.
 - Define and enforce JSON schema/output format for experiment plans.
