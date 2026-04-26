@@ -131,9 +131,6 @@ export default function Home() {
   const [plan, setPlan] = useState<PlanResponse | null>(null);
   const [activeTab, setActiveTab] = useState<PlanTab>("protocol");
 
-  const [reviewScore, setReviewScore] = useState(4);
-  const [reviewText, setReviewText] = useState("");
-  const [reviewStatus, setReviewStatus] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [currentStep, setCurrentStep] = useState<number | null>(null);
 
   const noveltyMeta = useMemo(() => {
@@ -166,7 +163,6 @@ export default function Home() {
   async function generatePlan() {
     setError(null);
     setLoading(true);
-    setReviewStatus(null);
     setPlan(null);
     setCurrentStep(0);
 
@@ -211,27 +207,7 @@ export default function Home() {
     }
   }
 
-  async function submitReview() {
-    if (!plan) return;
-    setReviewStatus({ message: "Submitting…", type: "success" });
 
-    const res = await fetch("/api/submit-review", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        hypothesis: plan.hypothesis,
-        score: reviewScore,
-        comments: reviewText,
-      }),
-    });
-
-    if (res.ok) {
-      setReviewStatus({ message: "Review saved. Future plans can use this feedback.", type: "success" });
-      setReviewText("");
-    } else {
-      setReviewStatus({ message: "Could not save review. Please try again.", type: "error" });
-    }
-  }
 
   return (
     <div className="page-shell">
@@ -605,64 +581,6 @@ export default function Home() {
               )}
             </section>
 
-            {/* ── Scientist Review ── */}
-            <section className="card" id="scientist-review">
-              <div className="section-label">
-                <div className="section-num">5</div>
-                <h2>Scientist Review</h2>
-              </div>
-              <p style={{ fontSize: "0.88rem", color: "var(--text-muted)", marginBottom: "1.25rem" }}>
-                Rate this plan and leave feedback to improve future generations.
-              </p>
-
-              <div className="input-label" style={{ marginBottom: "0.75rem" }}>Quality Score</div>
-              <div className="review-stars">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    className={`star-btn ${star <= reviewScore ? "active" : ""}`}
-                    onClick={() => setReviewScore(star)}
-                    aria-label={`Rate ${star} out of 5`}
-                    type="button"
-                  >
-                    {star <= reviewScore ? "★" : "☆"}
-                  </button>
-                ))}
-                <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", alignSelf: "center", marginLeft: "0.5rem" }}>
-                  {reviewScore} / 5
-                </span>
-              </div>
-
-              <div className="input-wrapper">
-                <label className="input-label" htmlFor="review-textarea">
-                  Feedback & Suggestions
-                </label>
-                <textarea
-                  id="review-textarea"
-                  value={reviewText}
-                  onChange={(e) => setReviewText(e.target.value)}
-                  rows={4}
-                  className="input"
-                  placeholder="What should be improved in the protocol, materials, budget, or timeline?"
-                />
-              </div>
-
-              <div className="actions">
-                <button
-                  className="btn-primary"
-                  onClick={submitReview}
-                  id="submit-review-btn"
-                >
-                  <span>Submit Review</span>
-                </button>
-              </div>
-
-              {reviewStatus && (
-                <div className={`review-status ${reviewStatus.type}`}>
-                  {reviewStatus.type === "success" ? "✓" : "✕"} {reviewStatus.message}
-                </div>
-              )}
-            </section>
           </>
         )}
       </main>
