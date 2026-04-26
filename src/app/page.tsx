@@ -11,6 +11,13 @@ type Reference = {
   url: string;
 };
 
+type ProtocolRef = {
+  title: string;
+  source: string;
+  url: string;
+  type: "protocol";
+};
+
 type PlanMaterial = {
   item: string;
   catalog: string;
@@ -34,6 +41,7 @@ type PlanResponse = {
   hypothesis: string;
   novelty: "not_found" | "similar" | "exact";
   references: Reference[];
+  protocols: ProtocolRef[];
   retrievedEvidence: string[];
   protocol: string[];
   materials: PlanMaterial[];
@@ -181,6 +189,7 @@ export default function Home() {
       const literature = (await literatureRes.json()) as {
         novelty: NoveltySignal;
         references: LiteratureReference[];
+        protocols: ProtocolRef[];
       };
 
       setCurrentStep(2);
@@ -365,10 +374,10 @@ export default function Home() {
                 </div>
               </div>
 
-              {plan.references.length > 0 && (
+              {plan.references.length > 0 ? (
                 <>
                   <div className="section-divider">
-                    {plan.references.length} Related References
+                    {plan.references.length} Related Reference{plan.references.length !== 1 ? "s" : ""}
                   </div>
                   <div className="ref-list" style={{ marginTop: "1rem" }}>
                     {plan.references.map((ref, i) => (
@@ -397,10 +406,55 @@ export default function Home() {
                     ))}
                   </div>
                 </>
+              ) : (
+                <div className="empty-refs">
+                  <span style={{ fontSize: "1.5rem" }}>🔍</span>
+                  <div>
+                    <p className="empty-refs-title">No related research found</p>
+                    <p className="empty-refs-sub">
+                      We searched arXiv, OpenAlex, and Crossref but found no closely
+                      matching papers. This may be an underexplored area — a good sign
+                      for novelty.
+                    </p>
+                  </div>
+                </div>
               )}
             </section>
 
-            {/* ── Step 3: Retrieval Evidence ── */}
+            {/* ── Protocol Repositories ── */}
+            {plan.protocols?.length > 0 && (
+              <section className="card" id="protocol-repos">
+                <div className="section-label">
+                  <div className="section-num" style={{ background: "linear-gradient(135deg,#818cf8,#c084fc)" }}>P</div>
+                  <h2>Matched Protocols</h2>
+                </div>
+                <p style={{ fontSize: "0.88rem", color: "var(--text-muted)", marginBottom: "1.25rem" }}>
+                  Existing protocols from repositories that match your hypothesis — used to ground the generated plan.
+                </p>
+                <div className="ref-list">
+                  {plan.protocols.map((p, i) => (
+                    <a
+                      key={p.url}
+                      href={p.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="ref-item"
+                    >
+                      <div className="ref-num" style={{ background: "rgba(192,132,252,0.12)", borderColor: "rgba(192,132,252,0.3)", color: "#c084fc" }}>
+                        {i + 1}
+                      </div>
+                      <div className="ref-body">
+                        <span className="ref-title">{p.title}</span>
+                        <div className="ref-meta">
+                          <span className="proto-badge">{p.source}</span>
+                        </div>
+                      </div>
+                      <div className="ref-arrow"><ExternalIcon /></div>
+                    </a>
+                  ))}
+                </div>
+              </section>
+            )}
             {plan.retrievedEvidence.length > 0 && (
               <section className="card" id="retrieval-evidence">
                 <div className="section-label">

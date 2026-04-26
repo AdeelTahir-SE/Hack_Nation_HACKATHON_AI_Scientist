@@ -7,6 +7,13 @@ export type LiteratureReference = {
   url: string;
 };
 
+export type ProtocolReference = {
+  title: string;
+  source: string;
+  url: string;
+  type: "protocol";
+};
+
 export type PlanMaterial = {
   item: string;
   catalog: string;
@@ -30,6 +37,7 @@ export type ExperimentPlan = {
   hypothesis: string;
   novelty: NoveltySignal;
   references: LiteratureReference[];
+  protocols: ProtocolReference[];
   retrievedEvidence: string[];
   protocol: string[];
   materials: PlanMaterial[];

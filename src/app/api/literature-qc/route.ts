@@ -12,6 +12,7 @@ export async function POST(request: Request) {
     }
 
     const result = await searchLiterature(hypothesis);
+    // Returns { novelty, references, protocols }
     return NextResponse.json(result);
   } catch {
     return NextResponse.json(
