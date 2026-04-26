@@ -16,87 +16,57 @@ function safeJsonParse(text: string): Partial<ExperimentPlan> | null {
   }
 }
 
-function buildFallbackPlan(input: GenerationInput): ExperimentPlan {
-  const materials = [
-    {
-      item: "Primary assay kit",
-      catalog: "KIT-001",
-      supplier: "Thermo Fisher",
-      estimatedCostUSD: 320,
-    },
-    {
-      item: "Control reagent set",
-      catalog: "CR-104",
-      supplier: "Sigma-Aldrich",
-      estimatedCostUSD: 180,
-    },
-    {
-      item: "Consumables",
-      catalog: "LAB-GEN",
-      supplier: "VWR",
-      estimatedCostUSD: 150,
-    },
-  ];
-
-  return {
-    hypothesis: input.hypothesis,
-    novelty: input.novelty,
-    references: input.references,
-    retrievedEvidence: input.retrievedEvidence,
-    protocol: [
-      "Define treatment and control groups with random allocation and inclusion criteria.",
-      "Run a pilot with n=3 replicates per arm to validate assay dynamic range.",
-      "Execute full experiment with fixed incubation and sampling windows.",
-      "Record reagent lots, temperature logs, and operator notes at each step.",
-      "Analyze primary endpoint against predefined success threshold and controls.",
-    ],
-    materials,
-    budget: [
-      { category: "Reagents", amountUSD: 650, notes: "Core assay and controls" },
-      { category: "Labor", amountUSD: 900, notes: "Two technicians over 2 weeks" },
-      { category: "QC and repeats", amountUSD: 250, notes: "Contingency for reruns" },
-    ],
-    timeline: [
-      { phase: "Setup and calibration", duration: "2 days", dependencies: [] },
-      { phase: "Pilot run", duration: "3 days", dependencies: ["Setup and calibration"] },
-      { phase: "Main execution", duration: "1 week", dependencies: ["Pilot run"] },
-      { phase: "Analysis and validation", duration: "3 days", dependencies: ["Main execution"] },
-    ],
-    validation: [
-      "Primary metric must exceed predefined threshold versus control.",
-      "Technical replicate CV should be below 15 percent.",
-      "Effect size and confidence intervals must agree with pilot trend.",
-    ],
-  };
+function isNonEmptyStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === "string");
 }
 
-function mergePlan(
-  generated: Partial<ExperimentPlan> | null,
-  fallback: ExperimentPlan,
-): ExperimentPlan {
-  if (!generated) return fallback;
+function validatePlanShape(generated: Partial<ExperimentPlan> | null): generated is ExperimentPlan {
+  if (!generated) return false;
 
-  return {
-    ...fallback,
-    ...generated,
-    hypothesis: fallback.hypothesis,
-    novelty: fallback.novelty,
-    references: fallback.references,
-    retrievedEvidence: fallback.retrievedEvidence,
-    protocol: generated.protocol?.length ? generated.protocol : fallback.protocol,
-    materials: generated.materials?.length ? generated.materials : fallback.materials,
-    budget: generated.budget?.length ? generated.budget : fallback.budget,
-    timeline: generated.timeline?.length ? generated.timeline : fallback.timeline,
-    validation: generated.validation?.length ? generated.validation : fallback.validation,
-  };
+  if (!isNonEmptyStringArray(generated.protocol)) return false;
+  if (!isNonEmptyStringArray(generated.validation)) return false;
+
+  const materialsValid =
+    Array.isArray(generated.materials) &&
+    generated.materials.length > 0 &&
+    generated.materials.every(
+      (item) =>
+        typeof item.item === "string" &&
+        typeof item.catalog === "string" &&
+        typeof item.supplier === "string" &&
+        typeof item.estimatedCostUSD === "number",
+    );
+
+  const budgetValid =
+    Array.isArray(generated.budget) &&
+    generated.budget.length > 0 &&
+    generated.budget.every(
+      (item) =>
+        typeof item.category === "string" &&
+        typeof item.amountUSD === "number" &&
+        typeof item.notes === "string",
+    );
+
+  const timelineValid =
+    Array.isArray(generated.timeline) &&
+    generated.timeline.length > 0 &&
+    generated.timeline.every(
+      (item) =>
+        typeof item.phase === "string" &&
+        typeof item.duration === "string" &&
+        Array.isArray(item.dependencies),
+    );
+
+  return materialsValid && budgetValid && timelineValid;
 }
 
 export async function generateExperimentPlan(input: GenerationInput): Promise<ExperimentPlan> {
-  const fallback = buildFallbackPlan(input);
 
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (!apiKey || apiKey.includes("your_")) {
-    return fallback;
+    throw new Error(
+      "Gemini API key is missing. Set GEMINI_API_KEY or GOOGLE_API_KEY in your environment.",
+    );
   }
 
   const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
@@ -131,7 +101,8 @@ export async function generateExperimentPlan(input: GenerationInput): Promise<Ex
   });
 
   if (!res.ok) {
-    return fallback;
+    const details = await res.text();
+    throw new Error(`Gemini request failed (${res.status}): ${details.slice(0, 240)}`);
   }
 
   const json = (await res.json()) as {
@@ -145,5 +116,17 @@ export async function generateExperimentPlan(input: GenerationInput): Promise<Ex
   const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
   const parsed = safeJsonParse(rawText);
 
-  return mergePlan(parsed, fallback);
+  if (!validatePlanShape(parsed)) {
+    throw new Error(
+      "Gemini response could not be parsed into a valid experiment plan schema.",
+    );
+  }
+
+  return {
+    ...parsed,
+    hypothesis: input.hypothesis,
+    novelty: input.novelty,
+    references: input.references,
+    retrievedEvidence: input.retrievedEvidence,
+  };
 }

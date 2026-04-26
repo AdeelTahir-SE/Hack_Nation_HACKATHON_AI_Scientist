@@ -4,17 +4,24 @@ import { getReviewExamples } from "@/lib/feedback";
 import { generateExperimentPlan } from "@/lib/gemini";
 import { searchLiterature } from "@/lib/literature";
 import { ingestKnowledgeChunks, retrieveEvidence } from "@/lib/rag";
+import type { LiteratureReference, NoveltySignal } from "@/types/plan";
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as { hypothesis?: string };
+    const body = (await request.json()) as {
+      hypothesis?: string;
+      literature?: {
+        novelty: NoveltySignal;
+        references: LiteratureReference[];
+      };
+    };
     const hypothesis = body.hypothesis?.trim();
 
     if (!hypothesis) {
       return NextResponse.json({ error: "Hypothesis is required." }, { status: 400 });
     }
 
-    const literature = await searchLiterature(hypothesis);
+    const literature = body.literature || (await searchLiterature(hypothesis));
 
     if (literature.references.length) {
       ingestKnowledgeChunks(
@@ -45,7 +52,8 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(plan);
-  } catch {
-    return NextResponse.json({ error: "Failed to generate experiment plan." }, { status: 500 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to generate experiment plan.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

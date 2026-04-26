@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { LiteratureReference, NoveltySignal } from "@/types/plan";
 
 type Reference = {
   title: string;
@@ -43,6 +44,13 @@ type PlanResponse = {
 const SAMPLE =
   "Replacing sucrose with trehalose as a cryoprotectant will increase post-thaw viability of HeLa cells by at least 15 percentage points compared to standard DMSO protocol.";
 
+const generationSteps = [
+  "Now fetching papers...",
+  "Now retrieving evidence...",
+  "Now generating report...",
+  "Finalizing output...",
+];
+
 export default function Home() {
   const [hypothesis, setHypothesis] = useState(SAMPLE);
   const [loading, setLoading] = useState(false);
@@ -52,6 +60,7 @@ export default function Home() {
   const [reviewScore, setReviewScore] = useState(4);
   const [reviewText, setReviewText] = useState("");
   const [reviewStatus, setReviewStatus] = useState<string | null>(null);
+  const [currentStep, setCurrentStep] = useState<number | null>(null);
 
   const noveltyLabel = useMemo(() => {
     if (!plan) return "";
@@ -64,12 +73,33 @@ export default function Home() {
     setError(null);
     setLoading(true);
     setReviewStatus(null);
+    setCurrentStep(0);
 
     try {
-      const res = await fetch("/api/generate-plan", {
+      const literatureRes = await fetch("/api/literature-qc", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ hypothesis }),
+      });
+
+      if (!literatureRes.ok) {
+        const payload = (await literatureRes.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        throw new Error(payload.error || "Failed to fetch papers");
+      }
+
+      const literature = (await literatureRes.json()) as {
+        novelty: NoveltySignal;
+        references: LiteratureReference[];
+      };
+
+      setCurrentStep(1);
+      setCurrentStep(2);
+      const res = await fetch("/api/generate-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hypothesis, literature }),
       });
 
       if (!res.ok) {
@@ -80,11 +110,13 @@ export default function Home() {
       }
 
       const payload = (await res.json()) as PlanResponse;
+      setCurrentStep(3);
       setPlan(payload);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
       setError(message);
     } finally {
+      setCurrentStep(null);
       setLoading(false);
     }
   }
@@ -138,6 +170,26 @@ export default function Home() {
               {loading ? "Generating..." : "Generate Experiment Plan"}
             </button>
           </div>
+          {loading && currentStep !== null ? (
+            <div className="steps-loader" aria-live="polite">
+              <p className="steps-title">{generationSteps[currentStep]}</p>
+              <ul className="steps-list">
+                {generationSteps.map((step, index) => {
+                  const status =
+                    index < currentStep ? "done" : index === currentStep ? "active" : "pending";
+
+                  return (
+                    <li key={step} className={`step-item step-${status}`}>
+                      <span className="step-icon" aria-hidden="true">
+                        {status === "done" ? "\u2713" : status === "active" ? "" : "\u2022"}
+                      </span>
+                      <span>{step}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : null}
           {error ? <p className="error">{error}</p> : null}
         </section>
 

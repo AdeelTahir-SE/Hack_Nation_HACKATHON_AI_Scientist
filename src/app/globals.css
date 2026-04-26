@@ -93,6 +93,75 @@ body {
   gap: 0.5rem;
 }
 
+.steps-loader {
+  margin-top: 0.9rem;
+  border: 1px solid #c8e4df;
+  background: #f2fbf8;
+  border-radius: 10px;
+  padding: 0.75rem;
+}
+
+.steps-title {
+  margin: 0 0 0.6rem;
+  font-weight: 700;
+  color: #0f4c5c;
+}
+
+.steps-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.step-item {
+  display: flex;
+  gap: 0.55rem;
+  align-items: center;
+  font-size: 0.95rem;
+}
+
+.step-icon {
+  width: 1rem;
+  height: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  line-height: 1;
+}
+
+.step-done {
+  color: #0e7c66;
+}
+
+.step-done .step-icon {
+  background: #d7f3ea;
+  font-weight: 700;
+}
+
+.step-active {
+  color: #0b5f75;
+  font-weight: 700;
+}
+
+.step-active .step-icon {
+  border: 2px solid #0b5f75;
+  border-top-color: transparent;
+  animation: spin 0.8s linear infinite;
+}
+
+.step-pending {
+  color: #5b6f7e;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 button {
   border: 0;
   cursor: pointer;

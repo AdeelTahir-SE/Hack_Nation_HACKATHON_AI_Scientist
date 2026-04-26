@@ -85,7 +85,7 @@ Strong hypotheses name a specific intervention, state a measurable outcome with 
 |---|---|
 | Frontend | Next.js / React |
 | Backend | Next.js Route Handlers (app/api/*) |
-| AI Generation | Google Gemini 3 API |
+| AI Generation | Google Gemini API (free tier) |
 | LLM Orchestration | LangChain (JavaScript/TypeScript) |
 | Literature Search | arXiv API, OpenAlex API, Crossref API |
 | Vector Database | Supabase pgvector |
@@ -130,7 +130,7 @@ ai-scientist/
 
 ### Prerequisites
 - Node.js 18+
-- A Google AI Studio API key for Gemini 3: https://aistudio.google.com/app/apikey
+- A free Google AI Studio API key for Gemini: https://aistudio.google.com/app/apikey
 - A Supabase project with pgvector enabled: https://supabase.com
 
 ### Installation
@@ -145,6 +145,7 @@ Create a .env.local file with:
 
 GEMINI_API_KEY=your_key_here
 GOOGLE_API_KEY=your_key_here
+GEMINI_MODEL=gemini-2.0-flash
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
@@ -153,6 +154,7 @@ OPENALEX_BASE_URL=https://api.openalex.org
 CROSSREF_BASE_URL=https://api.crossref.org
 
 Note: GEMINI_API_KEY and GOOGLE_API_KEY can be the same value. Some LangChain integrations read GOOGLE_API_KEY by default.
+For the free-key setup, keep GEMINI_MODEL on a flash model such as gemini-2.0-flash.
 
 ### Run Locally
 
