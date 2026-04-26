@@ -27,7 +27,8 @@ graph TB
         RAG["rag.ts\nLangChain retrieval"]
         VS["vectorstore.ts\nIn-memory vector index"]
         GEN["gemini.ts\nOllama client + prompt builder"]
-        FB["feedback.ts\nReview store"]
+        FB["feedback.ts\nSupabase review store"]
+        SB["supabase.ts\nLazy singleton client"]
     end
 
     subgraph LLM["🤖  Ollama LLM"]
@@ -38,6 +39,10 @@ graph TB
         AX["arXiv API"]
         OA["OpenAlex API"]
         CR["Crossref API"]
+    end
+
+    subgraph DB["🗄️  Supabase (PostgreSQL)"]
+        SUP["public.reviews table\nPersistent · RLS-protected"]
     end
 
     UI -->|"1 · submit hypothesis"| LitAPI
@@ -54,6 +59,8 @@ graph TB
     GEN -->|"ollama.chat()"| OL
 
     ReviewAPI --> FB
+    FB --> SB
+    SB -->|"insert / select"| SUP
     FB -.->|"few-shot examples"| GEN
 
     IngestAPI --> RAG
@@ -236,20 +243,23 @@ sequenceDiagram
 ```mermaid
 flowchart LR
     H["New hypothesis\n'HeLa cryopreservation'"]
-    H --> TOK["Tokenize hypothesis\n['hela', 'cryo', 'trehalose', ...]"]
-    TOK --> FILTER["reviewStore()\n.filter(r => any token in r.hypothesis)"]
-    FILTER --> SLICE[".slice(-3) — last 3 matching reviews"]
+    H --> TOK["Tokenize hypothesis\n['hela', 'cryo', 'trehalose', ...] (>3 chars)"]
+    TOK --> SQ["Supabase query\nSELECT last 50 reviews\nORDER BY created_at DESC"]
+    SQ --> FILTER["JS keyword filter\nreviewTokens.some(t => queryTokens.has(t))"]
+    FILTER --> SLICE[".slice(0, 3) — up to 3 matching reviews"]
     SLICE --> FORMAT["Format as few-shot blocks:\n'Review score N/5: [comments]'"]
     FORMAT --> INJ["Injected into buildPrompt()\n=== SCIENTIST FEEDBACK ==="]
     INJ --> OL["Ollama generates plan\nwith corrections as context"]
 
     style OL fill:#2d4a8a,color:#fff,stroke:#1a3060
     style INJ fill:#7a4a1a,color:#fff,stroke:#5c3010
+    style SQ fill:#1a4a6a,color:#fff,stroke:#0d3050
 ```
 
 **Key implementation facts:**
-- Token-matching uses word overlap (no embedding cost) — fast and domain-appropriate
-- Last-3 limit keeps the prompt from ballooning on repeated reviews
+- Supabase query pulls the last `poolSize=50` reviews ordered by recency — no full-table scan
+- Token-matching runs in JS using word overlap (no embedding cost) — fast and domain-appropriate
+- `limit=3` cap keeps the prompt from ballooning on highly-reviewed experiment types
 - Section corrections are merged into one string: `"Protocol: X | Materials: Y | Timeline: Z"`
 - The model sees corrections as **explicit named context** before generating — it directly incorporates them
 - No fine-tuning, no retraining, no re-prompting — the learning loop is fully automatic
@@ -277,7 +287,8 @@ graph TD
         RAG2["rag.ts\nEvidence retrieval\nKnowledge ingestion"]
         VEC["vectorstore.ts\nHash embedding\nCosine similarity\nIn-memory store"]
         LIT2["literature.ts\narXiv · OpenAlex\nCrossref search"]
-        FBK["feedback.ts\nReview store\nFew-shot retrieval"]
+        FBK["feedback.ts\nSupabase review store\nFew-shot retrieval"]
+        SBC["supabase.ts\nLazy singleton\nSupabase client"]
     end
 
     subgraph TYPES["src/types/"]
@@ -323,7 +334,7 @@ All server logic runs as edge-compatible Route Handlers — no separate Express/
 |---|---|---|
 | `/api/literature-qc` | `POST` | Fan-out to arXiv, OpenAlex, Crossref. Returns novelty signal + top-3 refs. |
 | `/api/generate-plan` | `POST` | Orchestrates RAG retrieval → prompt assembly → Ollama call → plan normalization. |
-| `/api/submit-review` | `POST` | Stores structured expert feedback in in-memory review store. |
+| `/api/submit-review` | `POST` | Stores structured expert feedback in Supabase PostgreSQL (`public.reviews`). |
 | `/api/ingest-knowledge` | `POST` | Accepts text chunks, embeds them, upserts into vector store. |
 
 ---
@@ -388,11 +399,14 @@ All three APIs are queried in parallel with `Promise.allSettled()`. Individual A
 
 | Attribute | Detail |
 |---|---|
-| **Implementation** | `src/lib/feedback.ts` — in-memory `Map` keyed by experiment type + domain |
-| **Stored fields** | `experimentType`, `domain`, `sectionCorrections`, `rating`, `timestamp` |
-| **Retrieval** | `getFeedbackExamples(type, domain, limit=3)` — returns top examples formatted as few-shot blocks |
+| **Implementation** | `src/lib/feedback.ts` — **Supabase-backed** (`@supabase/supabase-js ^2`) |
+| **Database** | Supabase PostgreSQL — `public.reviews` table with RLS policies |
+| **Stored fields** | `hypothesis` (TEXT), `score` (SMALLINT 1–5), `comments` (TEXT), `created_at` (TIMESTAMPTZ) |
+| **Save** | `saveReview(payload)` — `insert` into `reviews`, returns the inserted row |
+| **Retrieval** | `getReviewExamples(hypothesis, limit=3, poolSize=50)` — fetches the last 50 reviews, filters in-JS by keyword token overlap, returns up to 3 as few-shot strings |
 | **Injection point** | `buildPrompt()` in `gemini.ts` — section: `SCIENTIST FEEDBACK (from prior similar experiments)` |
-| **Upgrade path** | Swap in-memory Map for PostgreSQL / Supabase with one adapter file change |
+| **Persistence** | Reviews survive server restarts, `npm run dev` restarts, and Vercel cold starts |
+| **Setup** | Run `supabase_setup.sql` in Supabase SQL Editor; add `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` to `.env.local` |
 
 ---
 
@@ -409,7 +423,7 @@ User → [Hypothesis text]
        ↓
    vectorstore cosine search  →  top-4 evidence chunks
        ↓
-   feedback store lookup  →  0–3 few-shot expert corrections
+    Supabase query (last 50 reviews) → JS keyword filter → 0–3 few-shot expert corrections
        ↓
    buildPrompt()  →  [system | user] message pair with full JSON schema
        ↓
@@ -430,13 +444,15 @@ User → [Hypothesis text]
 
 | Component | Current | Upgrade Option |
 |---|---|---|
-| LLM | Ollama local | Remote Ollama server, OpenAI, Anthropic, Groq |
-| Embedding | 256-dim hash vector | `text-embedding-3-small`, `nomic-embed-text` via Ollama |
-| Vector store | In-memory `globalThis` | Pinecone, Weaviate, Qdrant, pgvector (Supabase) |
-| Feedback store | In-memory `Map` | PostgreSQL, Supabase, MongoDB |
+| LLM | Ollama local (self-hosted) | Remote Ollama server, OpenAI, Anthropic, Groq |
+| Embedding | 256-dim hash vector (in-process) | `text-embedding-3-small`, `nomic-embed-text` via Ollama |
+| Vector store | In-memory `globalThis` singleton | Pinecone, Weaviate, Qdrant, pgvector (Supabase) |
+| Feedback store | **Supabase PostgreSQL** (persistent) | Already production-ready; add auth for multi-user isolation |
 | Literature QC | arXiv + OpenAlex + Crossref | PubMed, Semantic Scholar, Scopus, IEEE Xplore |
 | Deployment | Local `npm run dev` | Vercel (frontend + API) + remote Ollama server |
 
 ---
 
 *Built for Fulcrum Science × MIT Club Challenge #04 · Team HN-9663*
+
+> **Note on `lib/gemini.ts` filename:** Named `gemini.ts` for historical reasons (an early prototype targeted the Gemini API). The actual implementation uses the `ollama` npm client throughout — the filename is a legacy artifact; the code is entirely Ollama-based.

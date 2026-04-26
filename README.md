@@ -145,17 +145,22 @@ npm install
 Create a `.env.local` file in the project root:
 
 ```env
-# Ollama — local server (no API key required for local use)
+# Ollama — required (even for local use; set any non-empty string for local)
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=qwen2.5:7b
+OLLAMA_API_KEY=local          # any non-empty value; real bearer token for Ollama Cloud
 
-# Literature search APIs (no key required for public access)
+# Supabase — required for the Scientist Review Loop
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+
+# Literature search APIs (all public, no key required)
 ARXIV_BASE_URL=https://export.arxiv.org/api/query
 OPENALEX_BASE_URL=https://api.openalex.org
 CROSSREF_BASE_URL=https://api.crossref.org
 ```
 
-> **Note:** `OLLAMA_API_KEY` is only needed if you are using Ollama Cloud (remote hosted). For local Ollama, leave it unset or omit it entirely. Set `OLLAMA_BASE_URL=http://localhost:11434` to point at your local Ollama server.
+> **Note on `OLLAMA_API_KEY`:** The generation layer validates this variable at runtime and throws if it is unset. For a **local** Ollama server set it to any non-empty string (e.g. `local`). For **Ollama Cloud** set it to your real bearer token and update `OLLAMA_BASE_URL` to your remote endpoint.
 
 ### Ollama Quick Check
 
@@ -249,20 +254,20 @@ User hypothesis
 - Lower hallucination rate in budget and timeline details
 - Higher consistency across repeated prompts for similar hypotheses
 
-### Feedback Loop (Stretch Goal)
+### Feedback Loop
 
 ```
 Scientist reviews generated plan (Section 5 — Review Loop UI)
 -> Star rating (1–5) + per-section correction textareas
 -> Structured annotations saved to Supabase reviews table
-   - hypothesis, score, merged section corrections, timestamp
+   - hypothesis, score, merged section corrections, created_at
 -> Next similar experiment request
--> Feedback retrieved from Supabase (keyword token match)
--> Injected as few-shot examples into Ollama generation prompt
+-> feedback.ts queries Supabase: last 50 reviews, keyword token match
+-> Matched reviews injected as few-shot examples into Ollama generation prompt
 -> Improved plan generated with no re-prompting required
 ```
 
-> Reviews persist across server restarts and deployments — every correction permanently improves future plans.
+> Reviews are persisted in Supabase PostgreSQL — they survive server restarts, `npm run dev` restarts, and Vercel cold starts. The judge can leave feedback on Plan 1, fully restart the server, and see it carried into Plan 2.
 
 ---
 

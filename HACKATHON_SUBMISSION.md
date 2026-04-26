@@ -109,8 +109,9 @@ The application is a pure Next.js project (no separate backend server). All API 
 - Novelty classification: `not_found`, `similar`, or `exact`
 
 **Feedback Store**
-- `src/lib/feedback.ts` stores structured corrections in app memory
-- Tagged by experiment type and domain for retrieval as few-shot examples
+- `src/lib/feedback.ts` stores structured corrections in **Supabase PostgreSQL** (`public.reviews` table)
+- Reviews persist across server restarts, `npm run dev` cycles, and Vercel cold starts
+- Retrievable by keyword token match for few-shot injection into the next similar plan
 
 **Frontend**
 - Next.js 16 + React 19 + TypeScript
@@ -121,6 +122,9 @@ The application is a pure Next.js project (no separate backend server). All API 
 ```
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=qwen2.5:7b
+OLLAMA_API_KEY=local          # any non-empty value for local Ollama
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
 ARXIV_BASE_URL=https://export.arxiv.org/api/query
 OPENALEX_BASE_URL=https://api.openalex.org
 CROSSREF_BASE_URL=https://api.crossref.org
@@ -181,14 +185,15 @@ After the experiment plan renders, a dedicated **Scientist Review Loop** section
 
 #### 2. Feedback Store (`src/lib/feedback.ts`)
 
-Corrections are captured in **structured form** and persisted in an in-memory review store:
+Corrections are captured in **structured form** and persisted in **Supabase PostgreSQL** (`public.reviews` table):
 
 ```ts
 type StoredReview = {
-  hypothesis: string;      // the original hypothesis text
-  score: number;           // 1–5 rating
-  comments: string;        // merged: general + per-section corrections
-  createdAt: string;       // ISO timestamp
+  id: number;          // auto-generated BIGSERIAL primary key
+  hypothesis: string;  // the original hypothesis text
+  score: number;       // 1–5 rating
+  comments: string;    // merged: general + per-section corrections
+  created_at: string;  // ISO timestamp (TIMESTAMPTZ, set by Supabase)
 };
 ```
 
@@ -243,15 +248,15 @@ A system that learns from scientist feedback compounds in value over time. Every
 
 The feedback loop requires zero retraining, zero model updates, and zero user re-prompting — corrections flow silently from the review interface into the generation layer through the few-shot injection mechanism.
 
-**Upgrade path:** The in-memory store is a drop-in for PostgreSQL, Supabase, or any persistent backend. The `getReviewExamples()` interface is unchanged — swap the store and the learning loop persists across server restarts.
+**Persistent learning by design:** The feedback store is backed by Supabase PostgreSQL — reviews survive server restarts, re-deployments, and Vercel cold starts. The judge can leave feedback on Plan 1, fully restart the dev server, and see those corrections automatically carried into Plan 2's generation prompt.
 
 **Note on `lib/gemini.ts` filename:** The file is named `gemini.ts` for historical reasons (an early prototype used the Gemini API). The actual implementation uses the Ollama JavaScript client throughout — the filename is an artifact and the code is entirely Ollama-based.
 
 **Ollama model flexibility:** The app works with any model available on the local Ollama server. We recommend `qwen2.5:7b` for a good balance of speed and structured JSON output quality. Larger models (e.g., `qwen2.5:72b`, `llama3.1:70b`) improve plan specificity but require more VRAM.
 
-**Upgrade paths:**
+**Production upgrade paths:**
 - Vector store: swap in-memory index for Pinecone, Weaviate, or pgvector
-- Feedback store: persist to PostgreSQL or Supabase for multi-session learning
+- Feedback store: already backed by Supabase PostgreSQL — production-ready out of the box
 - Deployment: Vercel (frontend + API routes) + a remote Ollama server or any hosted LLM endpoint
 
 ---
@@ -297,8 +302,8 @@ The feedback loop requires zero retraining, zero model updates, and zero user re
 5. **(50–60s)** Quick summary: "Local Ollama + LangChain RAG → full experiment plan in under 60 seconds"
 
 ### Tech Video Script Outline (60s)
-1. **(0–10s)** Architecture overview: Next.js frontend, `/api/` route handlers, Ollama local LLM
+1. **(0–10s)** Architecture overview: Next.js frontend, `/api/` route handlers, Ollama local LLM, Supabase review store
 2. **(10–25s)** Show `lib/gemini.ts` — prompt building, JSON schema, multi-attempt retry, normalizers
 3. **(25–40s)** Show `lib/rag.ts` + `lib/vectorstore.ts` — chunking, embedding, top-k retrieval, context injection
 4. **(40–52s)** Show `lib/literature.ts` — parallel arXiv / OpenAlex / Crossref search + novelty classification
-5. **(52–60s)** Show `lib/feedback.ts` — review store + few-shot injection for next experiment of same type
+5. **(52–60s)** Show `lib/feedback.ts` + `lib/supabase.ts` — Supabase-backed review store, keyword retrieval, few-shot injection
