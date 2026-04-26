@@ -30,7 +30,7 @@ Before generating a plan, the tool runs a fast novelty check:
 - Similar work exists - builds on prior art with references
 - Exact match found - the protocol has been done before
 
-Returns 1 to 3 relevant references from arXiv, Semantic Scholar, or protocol repositories.
+Returns 1 to 3 relevant references from arXiv, OpenAlex, Crossref, or protocol repositories.
 
 ### 3. Retrieval Grounding for Better Results
 To improve reliability and reduce hallucinations, generation is grounded with a retrieval layer:
@@ -85,9 +85,9 @@ Strong hypotheses name a specific intervention, state a measurable outcome with 
 |---|---|
 | Frontend | Next.js / React |
 | Backend | Next.js Route Handlers (app/api/*) |
-| AI Generation | Google Gemini API (free tier) |
+| AI Generation | Google Gemini 3 API |
 | LLM Orchestration | LangChain (JavaScript/TypeScript) |
-| Literature Search | Semantic Scholar API, arXiv |
+| Literature Search | arXiv API, OpenAlex API, Crossref API |
 | Vector Database | Supabase pgvector |
 | Application Database | Supabase (feedback store) |
 | Deployment | Vercel |
@@ -120,7 +120,7 @@ ai-scientist/
 |  |- gemini.ts                          # Gemini API integration
 |  |- rag.ts                             # Retrieval pipeline with LangChain
 |  |- vectorstore.ts                     # Supabase pgvector client utilities
-|  |- literature.ts                      # arXiv and Semantic Scholar search
+|  |- literature.ts                      # arXiv, OpenAlex, and Crossref search
 |  |- feedback.ts                        # Feedback store logic
 |- README.md
 
@@ -130,7 +130,7 @@ ai-scientist/
 
 ### Prerequisites
 - Node.js 18+
-- A Google AI Studio API key for Gemini free tier: https://aistudio.google.com/app/apikey
+- A Google AI Studio API key for Gemini 3: https://aistudio.google.com/app/apikey
 - A Supabase project with pgvector enabled: https://supabase.com
 
 ### Installation
@@ -148,7 +148,9 @@ GOOGLE_API_KEY=your_key_here
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-SEMANTIC_SCHOLAR_API_KEY=your_key_here
+ARXIV_BASE_URL=https://export.arxiv.org/api/query
+OPENALEX_BASE_URL=https://api.openalex.org
+CROSSREF_BASE_URL=https://api.crossref.org
 
 Note: GEMINI_API_KEY and GOOGLE_API_KEY can be the same value. Some LangChain integrations read GOOGLE_API_KEY by default.
 
@@ -163,7 +165,7 @@ Start development server with npm run dev and open http://localhost:3000
 ### Plan Generation Pipeline
 
 User hypothesis
--> Literature QC (Semantic Scholar / arXiv)
+-> Literature QC (arXiv / OpenAlex / Crossref)
 -> Novelty signal: not found / similar / exact match
 -> 1 to 3 references surfaced
 -> Retrieval grounding (LangChain + pgvector)

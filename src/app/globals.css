@@ -1,8 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f7f4ea;
+  --foreground: #102a43;
+  --card: #fffdf8;
+  --accent: #14746f;
+  --accent-2: #d68c45;
+  --line: #d8d1c5;
 }
 
 @theme inline {
@@ -12,15 +16,169 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  margin: 0;
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at 10% 10%, rgba(20, 116, 111, 0.16), transparent 32%),
+    radial-gradient(circle at 90% 0%, rgba(214, 140, 69, 0.2), transparent 24%),
+    var(--background);
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.page-shell {
+  min-height: 100vh;
+  padding: 2rem 1rem 4rem;
+}
+
+.content-wrap {
+  max-width: 960px;
+  margin: 0 auto;
+  display: grid;
+  gap: 1rem;
+}
+
+.hero {
+  padding: 1.25rem 1.25rem 0.75rem;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.1;
+}
+
+.hero p {
+  margin: 0.5rem 0;
+  max-width: 72ch;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.8rem;
+  color: #355070;
+}
+
+.card {
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 14px;
+  padding: 1rem;
+  box-shadow: 0 6px 16px rgba(16, 42, 67, 0.08);
+}
+
+.card h2 {
+  margin-top: 0;
+}
+
+.card h3 {
+  margin-bottom: 0.5rem;
+  margin-top: 1.2rem;
+}
+
+.input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.75rem;
+  font: inherit;
+  color: inherit;
+  background: #fff;
+}
+
+.actions {
+  margin-top: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+button {
+  border: 0;
+  cursor: pointer;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent), #0a9396);
+  color: white;
+  padding: 0.65rem 1rem;
+  font-weight: 600;
+}
+
+button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.list,
+.ordered {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.list li,
+.ordered li {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.list a {
+  color: #0f4c5c;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.pill {
+  display: inline-block;
+  margin: 0 0 0.6rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  font-weight: 600;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.94rem;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--line);
+  padding: 0.45rem;
+  text-align: left;
+}
+
+.review-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.review-row input {
+  width: 6rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.4rem;
+}
+
+.error {
+  color: #b42318;
+}
+
+@media (max-width: 700px) {
+  .page-shell {
+    padding: 1rem 0.75rem 2rem;
+  }
+
+  .card {
+    padding: 0.85rem;
+  }
 }
