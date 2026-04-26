@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { LiteratureReference, NoveltySignal } from "@/types/plan";
 
+/* ─── Types ─────────────────────────────────────────────────── */
 type Reference = {
   title: string;
   source: string;
@@ -41,57 +42,132 @@ type PlanResponse = {
   validation: string[];
 };
 
+type PlanTab = "protocol" | "materials" | "budget" | "timeline" | "validation";
+
+/* ─── Constants ─────────────────────────────────────────────── */
 const SAMPLE =
   "Replacing sucrose with trehalose as a cryoprotectant will increase post-thaw viability of HeLa cells by at least 15 percentage points compared to standard DMSO protocol.";
 
-const generationSteps = [
-  "Now fetching papers...",
-  "Now retrieving evidence...",
-  "Now generating report...",
-  "Finalizing output...",
+const EXAMPLES = [
+  "Trehalose vs DMSO cryoprotectant in HeLa cells",
+  "CRISPR-Cas9 knockout of TP53 in lung cancer",
+  "Ketogenic diet reduces glioma proliferation in mice",
 ];
 
+const GENERATION_STEPS = [
+  { label: "Fetching literature", icon: "📚" },
+  { label: "Retrieving evidence", icon: "🔍" },
+  { label: "Generating experiment plan", icon: "🧪" },
+  { label: "Finalizing output", icon: "✅" },
+];
+
+const PLAN_TABS: { key: PlanTab; label: string; icon: string }[] = [
+  { key: "protocol", label: "Protocol", icon: "🔬" },
+  { key: "materials", label: "Materials", icon: "🧫" },
+  { key: "budget", label: "Budget", icon: "💰" },
+  { key: "timeline", label: "Timeline", icon: "📅" },
+  { key: "validation", label: "Validation", icon: "✓" },
+];
+
+/* ─── Helpers ────────────────────────────────────────────────── */
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: 2,
+    maximumFractionDigits: 0,
   }).format(value);
 }
 
+function totalBudget(budget: PlanBudget[]): number {
+  return budget.reduce((sum, b) => sum + b.amountUSD, 0);
+}
+
+/* ─── Icons ──────────────────────────────────────────────────── */
+function FlaskIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 3h6M9 3v6l-4 8h14l-4-8V3"/>
+    </svg>
+  );
+}
+
+function ArrowRightIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 12h14M12 5l7 7-7 7"/>
+    </svg>
+  );
+}
+
+function ExternalIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
+    </svg>
+  );
+}
+
+function AlertIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+  );
+}
+
+/* ─── Main Component ─────────────────────────────────────────── */
 export default function Home() {
   const [hypothesis, setHypothesis] = useState(SAMPLE);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<PlanResponse | null>(null);
+  const [activeTab, setActiveTab] = useState<PlanTab>("protocol");
 
   const [reviewScore, setReviewScore] = useState(4);
   const [reviewText, setReviewText] = useState("");
-  const [reviewStatus, setReviewStatus] = useState<string | null>(null);
+  const [reviewStatus, setReviewStatus] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [currentStep, setCurrentStep] = useState<number | null>(null);
 
-  const noveltyLabel = useMemo(() => {
-    if (!plan) return "";
-    if (plan.novelty === "exact") return "Exact match found";
-    if (plan.novelty === "similar") return "Similar prior work";
-    return "Novel direction";
-  }, [plan]);
-
-  const priorWorkMessage = useMemo(() => {
-    if (!plan) return "";
-    if (plan.novelty === "exact") {
-      return "This work appears to be already done with closely matching results. Reproduce or extend it with a meaningful variation.";
-    }
-    if (plan.novelty === "similar") {
-      return "Related work already exists. Continue by improving controls, conditions, or outcome targets.";
-    }
-    return "No strong prior match found. Continue with the proposed experiment plan.";
+  const noveltyMeta = useMemo(() => {
+    if (!plan) return null;
+    if (plan.novelty === "exact")
+      return {
+        label: "Exact Match Found",
+        icon: "🔴",
+        variant: "novelty-exact",
+        message:
+          "This work appears to be already done with closely matching results. Consider reproducing it with a meaningful variation or extending the scope.",
+      };
+    if (plan.novelty === "similar")
+      return {
+        label: "Similar Prior Work",
+        icon: "🟡",
+        variant: "novelty-similar",
+        message:
+          "Related work already exists. Strengthen your contribution by improving controls, experimental conditions, or outcome targets.",
+      };
+    return {
+      label: "Novel Direction",
+      icon: "🟢",
+      variant: "novelty-novel",
+      message:
+        "No strong prior match found in the literature. Your hypothesis explores a genuinely new direction — proceed with the proposed experiment plan.",
+    };
   }, [plan]);
 
   async function generatePlan() {
     setError(null);
     setLoading(true);
     setReviewStatus(null);
+    setPlan(null);
     setCurrentStep(0);
 
     try {
@@ -102,9 +178,7 @@ export default function Home() {
       });
 
       if (!literatureRes.ok) {
-        const payload = (await literatureRes.json().catch(() => ({}))) as {
-          error?: string;
-        };
+        const payload = (await literatureRes.json().catch(() => ({}))) as { error?: string };
         throw new Error(payload.error || "Failed to fetch papers");
       }
 
@@ -113,7 +187,6 @@ export default function Home() {
         references: LiteratureReference[];
       };
 
-      setCurrentStep(1);
       setCurrentStep(2);
       const res = await fetch("/api/generate-plan", {
         method: "POST",
@@ -122,18 +195,16 @@ export default function Home() {
       });
 
       if (!res.ok) {
-        const payload = (await res.json().catch(() => ({}))) as {
-          error?: string;
-        };
+        const payload = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(payload.error || "Failed to generate plan");
       }
 
       const payload = (await res.json()) as PlanResponse;
       setCurrentStep(3);
       setPlan(payload);
+      setActiveTab("protocol");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unknown error";
-      setError(message);
+      setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setCurrentStep(null);
       setLoading(false);
@@ -142,7 +213,7 @@ export default function Home() {
 
   async function submitReview() {
     if (!plan) return;
-    setReviewStatus("Submitting review...");
+    setReviewStatus({ message: "Submitting…", type: "success" });
 
     const res = await fetch("/api/submit-review", {
       method: "POST",
@@ -155,199 +226,445 @@ export default function Home() {
     });
 
     if (res.ok) {
-      setReviewStatus("Review saved. Future plans can use this feedback.");
+      setReviewStatus({ message: "Review saved. Future plans can use this feedback.", type: "success" });
       setReviewText("");
-      return;
+    } else {
+      setReviewStatus({ message: "Could not save review. Please try again.", type: "error" });
     }
-
-    setReviewStatus("Could not save review. Please try again.");
   }
 
   return (
     <div className="page-shell">
-      <main className="content-wrap">
-        <header className="hero">
-          <p className="eyebrow">Fulcrum Science x MIT Challenge</p>
-          <h1>AI Scientist</h1>
-          <p>
-            Turn a natural-language hypothesis into an operational experiment
-            plan with literature QC, retrieval grounding, and structured output.
+      <div className="grid-bg" />
+
+      {/* ── Navbar ── */}
+      <nav className="navbar">
+        <div className="nav-brand">
+          <div className="nav-logo">AI</div>
+          <span className="nav-title">AI Scientist</span>
+        </div>
+        <span className="nav-badge">Fulcrum × MIT</span>
+      </nav>
+
+      <main className="content-wrap" style={{ paddingTop: "5rem" }}>
+
+        {/* ── Hero ── */}
+        <header className="hero" style={{ paddingTop: "3rem" }}>
+          <div className="hero-eyebrow">
+            Retrieval-Grounded Experiment Planning
+          </div>
+          <h1>Turn Your Hypothesis<br />Into a Complete Experiment</h1>
+          <p className="hero-subtitle">
+            Enter a scientific question in plain language. Our AI searches real papers,
+            evaluates novelty, retrieves evidence, and generates a structured experiment plan
+            with protocol, materials, budget, and timeline.
           </p>
+          {!plan && (
+            <div className="hero-stats">
+              <div className="hero-stat">
+                <div className="hero-stat-value">4</div>
+                <div className="hero-stat-label">Pipeline Steps</div>
+              </div>
+              <div className="hero-stat">
+                <div className="hero-stat-value">RAG</div>
+                <div className="hero-stat-label">Grounded Retrieval</div>
+              </div>
+              <div className="hero-stat">
+                <div className="hero-stat-value">LLM</div>
+                <div className="hero-stat-label">Gemini-Powered</div>
+              </div>
+            </div>
+          )}
         </header>
 
-        <section className="card">
-          <h2>1. Hypothesis Input</h2>
-          <textarea
-            value={hypothesis}
-            onChange={(event) => setHypothesis(event.target.value)}
-            rows={5}
-            className="input"
-            placeholder="Describe a testable scientific hypothesis..."
-          />
-          <div className="actions">
-            <button onClick={generatePlan} disabled={loading || !hypothesis.trim()}>
-              {loading ? "Generating..." : "Generate Experiment Plan"}
-            </button>
+        {/* ── Step 1: Input ── */}
+        <section className="card" id="hypothesis-input">
+          <div className="section-label">
+            <div className="section-num">1</div>
+            <h2>Hypothesis Input</h2>
           </div>
-          {loading && currentStep !== null ? (
-            <div className="steps-loader" aria-live="polite">
-              <p className="steps-title">{generationSteps[currentStep]}</p>
-              <ul className="steps-list">
-                {generationSteps.map((step, index) => {
-                  const status =
-                    index < currentStep ? "done" : index === currentStep ? "active" : "pending";
 
+          <div className="example-chips">
+            <span className="example-label">Try:</span>
+            {EXAMPLES.map((ex) => (
+              <button
+                key={ex}
+                className="chip"
+                onClick={() => setHypothesis(ex)}
+                type="button"
+              >
+                {ex}
+              </button>
+            ))}
+          </div>
+
+          <div className="input-wrapper">
+            <label className="input-label" htmlFor="hypothesis-textarea">
+              Scientific Hypothesis
+            </label>
+            <textarea
+              id="hypothesis-textarea"
+              value={hypothesis}
+              onChange={(e) => setHypothesis(e.target.value)}
+              rows={5}
+              className="input"
+              placeholder="Describe a testable scientific hypothesis in plain language…"
+              style={{ minHeight: "130px" }}
+            />
+            <div className="input-footer">
+              <span className="char-count">{hypothesis.length} characters</span>
+            </div>
+          </div>
+
+          <div className="actions">
+            <button
+              className="btn-primary"
+              onClick={generatePlan}
+              disabled={loading || !hypothesis.trim()}
+              id="generate-btn"
+            >
+              <span><FlaskIcon /></span>
+              <span>{loading ? "Generating…" : "Generate Experiment Plan"}</span>
+              {!loading && <span><ArrowRightIcon /></span>}
+            </button>
+            {plan && (
+              <button
+                className="btn-secondary"
+                onClick={() => { setPlan(null); setError(null); }}
+              >
+                ↺ Start over
+              </button>
+            )}
+          </div>
+
+          {/* Loading stepper */}
+          {loading && currentStep !== null && (
+            <div className="steps-loader" aria-live="polite">
+              <div className="steps-header">
+                <div className="steps-spinner" />
+                <span className="steps-title">{GENERATION_STEPS[currentStep]?.label}…</span>
+              </div>
+              <ul className="steps-list">
+                {GENERATION_STEPS.map((step, idx) => {
+                  const status =
+                    idx < currentStep ? "done" : idx === currentStep ? "active" : "pending";
                   return (
-                    <li key={step} className={`step-item step-${status}`}>
+                    <li key={step.label} className={`step-item step-${status}`}>
                       <span className="step-icon" aria-hidden="true">
-                        {status === "done" ? "\u2713" : status === "active" ? "" : "\u2022"}
+                        {status === "done" ? "✓" : status === "active" ? "" : "·"}
                       </span>
-                      <span>{step}</span>
+                      <span>{step.icon} {step.label}</span>
                     </li>
                   );
                 })}
               </ul>
             </div>
-          ) : null}
-          {error ? <p className="error">{error}</p> : null}
+          )}
+
+          {error && (
+            <div className="error-box">
+              <AlertIcon />
+              <span>{error}</span>
+            </div>
+          )}
         </section>
 
-        {plan ? (
+        {/* ── Results ── */}
+        {plan && noveltyMeta && (
           <>
-            <section className="card">
-              <h2>2. Literature QC</h2>
-              <p className="pill">{noveltyLabel}</p>
-              <div className="status-box">
-                <strong>Decision</strong>
-                <p>{priorWorkMessage}</p>
+            {/* ── Step 2: Literature QC ── */}
+            <section className="card card-accent" id="literature-qc">
+              <div className="section-label">
+                <div className="section-num">2</div>
+                <h2>Literature QC</h2>
               </div>
-              <ul className="list">
-                {plan.references.map((ref) => (
-                  <li key={ref.url}>
-                    <a href={ref.url} target="_blank" rel="noreferrer">
-                      {ref.title}
-                    </a>
-                    <span>
-                      {ref.source}
-                      {ref.year ? `, ${ref.year}` : ""}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
 
-            <section className="card">
-              <h2>3. Retrieval Evidence</h2>
-              <ul className="list">
-                {plan.retrievedEvidence.map((chunk) => (
-                  <li key={chunk}>
-                    <span>{chunk}</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
+              <div className={`novelty-banner ${noveltyMeta.variant}`}>
+                <div className="novelty-icon">
+                  <span style={{ fontSize: "1.4rem" }}>{noveltyMeta.icon}</span>
+                </div>
+                <div className="novelty-content">
+                  <div className="novelty-pill">{noveltyMeta.label}</div>
+                  <p className="novelty-message">{noveltyMeta.message}</p>
+                </div>
+              </div>
 
-            <section className="card">
-              <h2>4. Full Experiment Plan</h2>
-
-              <h3>Protocol</h3>
-              <ol className="ordered">
-                {plan.protocol.map((step) => (
-                  <li key={step}>{step}</li>
-                ))}
-              </ol>
-
-              <h3>Materials</h3>
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Item</th>
-                      <th>Catalog</th>
-                      <th>Supplier</th>
-                      <th>Cost (USD)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {plan.materials.map((material) => (
-                      <tr key={`${material.item}-${material.catalog}`}>
-                        <td>{material.item}</td>
-                        <td>{material.catalog}</td>
-                        <td>{material.supplier}</td>
-                        <td>
-                          {typeof material.estimatedCostUSD === "number"
-                            ? formatCurrency(material.estimatedCostUSD)
-                            : "N/A"}
-                        </td>
-                      </tr>
+              {plan.references.length > 0 && (
+                <>
+                  <div className="section-divider">
+                    {plan.references.length} Related References
+                  </div>
+                  <div className="ref-list" style={{ marginTop: "1rem" }}>
+                    {plan.references.map((ref, i) => (
+                      <a
+                        key={ref.url}
+                        href={ref.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="ref-item"
+                      >
+                        <div className="ref-num">{i + 1}</div>
+                        <div className="ref-body">
+                          <span className="ref-title">{ref.title}</span>
+                          <div className="ref-meta">
+                            <span>{ref.source}</span>
+                            {ref.year && (
+                              <>
+                                <span style={{ color: "var(--border)" }}>·</span>
+                                <span>{ref.year}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <div className="ref-arrow"><ExternalIcon /></div>
+                      </a>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <h3>Budget</h3>
-              <ul className="list">
-                {plan.budget.map((line) => (
-                  <li key={`${line.category}-${line.notes}`}>
-                    <span>
-                      <strong>{line.category}:</strong> {formatCurrency(line.amountUSD)}
-                    </span>
-                    <span>
-                      <strong>Notes:</strong> {line.notes || "N/A"}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-
-              <h3>Timeline</h3>
-              <ul className="list">
-                {plan.timeline.map((phase) => (
-                  <li key={phase.phase}>
-                    <span>
-                      <strong>{phase.phase}</strong> ({phase.duration})
-                    </span>
-                    <span>Depends on: {phase.dependencies.join(", ") || "None"}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <h3>Validation</h3>
-              <ul className="list">
-                {plan.validation.map((item) => (
-                  <li key={item}>
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
+                  </div>
+                </>
+              )}
             </section>
 
-            <section className="card">
-              <h2>Scientist Review</h2>
-              <div className="review-row">
-                <label htmlFor="score">Score (1 to 5)</label>
-                <input
-                  id="score"
-                  type="number"
-                  min={1}
-                  max={5}
-                  value={reviewScore}
-                  onChange={(event) => setReviewScore(Number(event.target.value || 4))}
+            {/* ── Step 3: Retrieval Evidence ── */}
+            {plan.retrievedEvidence.length > 0 && (
+              <section className="card" id="retrieval-evidence">
+                <div className="section-label">
+                  <div className="section-num">3</div>
+                  <h2>Retrieval Evidence</h2>
+                </div>
+                <p style={{ fontSize: "0.88rem", color: "var(--text-muted)", marginBottom: "1.25rem" }}>
+                  Relevant passages retrieved from the knowledge base to ground the generated plan.
+                </p>
+                <div className="evidence-list">
+                  {plan.retrievedEvidence.map((chunk, i) => (
+                    <div key={i} className="evidence-item" style={{ animationDelay: `${i * 0.06}s` }}>
+                      <span className="evidence-quote-icon">❝</span>
+                      <p className="evidence-text">{chunk}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* ── Step 4: Full Experiment Plan ── */}
+            <section className="card" id="experiment-plan">
+              <div className="section-label">
+                <div className="section-num">4</div>
+                <h2>Full Experiment Plan</h2>
+              </div>
+
+              {/* Summary bar */}
+              <div className="plan-summary-bar">
+                <div className="summary-stat">
+                  <div className="summary-stat-value">{plan.protocol.length}</div>
+                  <div className="summary-stat-label">Protocol Steps</div>
+                </div>
+                <div className="summary-stat">
+                  <div className="summary-stat-value">{plan.materials.length}</div>
+                  <div className="summary-stat-label">Materials</div>
+                </div>
+                <div className="summary-stat">
+                  <div className="summary-stat-value">
+                    {formatCurrency(totalBudget(plan.budget))}
+                  </div>
+                  <div className="summary-stat-label">Total Budget</div>
+                </div>
+                <div className="summary-stat">
+                  <div className="summary-stat-value">{plan.timeline.length}</div>
+                  <div className="summary-stat-label">Timeline Phases</div>
+                </div>
+              </div>
+
+              {/* Tabs */}
+              <div className="plan-tabs" role="tablist">
+                {PLAN_TABS.map((tab) => (
+                  <button
+                    key={tab.key}
+                    role="tab"
+                    aria-selected={activeTab === tab.key}
+                    className={`plan-tab ${activeTab === tab.key ? "active" : ""}`}
+                    onClick={() => setActiveTab(tab.key)}
+                    id={`tab-${tab.key}`}
+                  >
+                    <span>{tab.icon}</span>
+                    <span>{tab.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Protocol */}
+              {activeTab === "protocol" && (
+                <div role="tabpanel" aria-labelledby="tab-protocol">
+                  <ol className="protocol-list">
+                    {plan.protocol.map((step, i) => (
+                      <li
+                        key={i}
+                        className="protocol-item"
+                        style={{ animationDelay: `${i * 0.05}s` }}
+                      >
+                        <div className="protocol-step-num">{i + 1}</div>
+                        <p className="protocol-text">{step}</p>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+
+              {/* Materials */}
+              {activeTab === "materials" && (
+                <div role="tabpanel" aria-labelledby="tab-materials">
+                  <div className="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Item</th>
+                          <th>Catalog #</th>
+                          <th>Supplier</th>
+                          <th>Est. Cost</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {plan.materials.map((m, i) => (
+                          <tr key={`${m.item}-${i}`}>
+                            <td style={{ color: "var(--text-primary)", fontWeight: 600 }}>{m.item}</td>
+                            <td style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.85rem" }}>
+                              {m.catalog || "—"}
+                            </td>
+                            <td>{m.supplier}</td>
+                            <td className="cost-cell">
+                              {typeof m.estimatedCostUSD === "number"
+                                ? formatCurrency(m.estimatedCostUSD)
+                                : "N/A"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Budget */}
+              {activeTab === "budget" && (
+                <div role="tabpanel" aria-labelledby="tab-budget">
+                  <div className="budget-grid">
+                    {plan.budget.map((line, i) => (
+                      <div key={`${line.category}-${i}`} className="budget-card">
+                        <div className="budget-category">{line.category}</div>
+                        <div className="budget-amount">{formatCurrency(line.amountUSD)}</div>
+                        <div className="budget-notes">{line.notes || "—"}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="budget-total-row">
+                    <span className="budget-total-label">Total Estimated Budget</span>
+                    <span className="budget-total-value">{formatCurrency(totalBudget(plan.budget))}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Timeline */}
+              {activeTab === "timeline" && (
+                <div role="tabpanel" aria-labelledby="tab-timeline">
+                  <div className="timeline-track">
+                    {plan.timeline.map((phase, i) => (
+                      <div key={phase.phase} className="timeline-item" style={{ animationDelay: `${i * 0.07}s` }}>
+                        <div className="timeline-phase">{phase.phase}</div>
+                        <div className="timeline-duration">⏱ {phase.duration}</div>
+                        {phase.dependencies.length > 0 && (
+                          <div>
+                            <div className="timeline-deps">Depends on:</div>
+                            <div className="timeline-deps-chips">
+                              {phase.dependencies.map((dep) => (
+                                <span key={dep} className="dep-chip">{dep}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Validation */}
+              {activeTab === "validation" && (
+                <div role="tabpanel" aria-labelledby="tab-validation">
+                  <div className="validation-list">
+                    {plan.validation.map((item, i) => (
+                      <div
+                        key={i}
+                        className="validation-item"
+                        style={{ animationDelay: `${i * 0.05}s` }}
+                      >
+                        <div className="validation-check"><CheckIcon /></div>
+                        <span>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {/* ── Scientist Review ── */}
+            <section className="card" id="scientist-review">
+              <div className="section-label">
+                <div className="section-num">5</div>
+                <h2>Scientist Review</h2>
+              </div>
+              <p style={{ fontSize: "0.88rem", color: "var(--text-muted)", marginBottom: "1.25rem" }}>
+                Rate this plan and leave feedback to improve future generations.
+              </p>
+
+              <div className="input-label" style={{ marginBottom: "0.75rem" }}>Quality Score</div>
+              <div className="review-stars">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    className={`star-btn ${star <= reviewScore ? "active" : ""}`}
+                    onClick={() => setReviewScore(star)}
+                    aria-label={`Rate ${star} out of 5`}
+                    type="button"
+                  >
+                    {star <= reviewScore ? "★" : "☆"}
+                  </button>
+                ))}
+                <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", alignSelf: "center", marginLeft: "0.5rem" }}>
+                  {reviewScore} / 5
+                </span>
+              </div>
+
+              <div className="input-wrapper">
+                <label className="input-label" htmlFor="review-textarea">
+                  Feedback & Suggestions
+                </label>
+                <textarea
+                  id="review-textarea"
+                  value={reviewText}
+                  onChange={(e) => setReviewText(e.target.value)}
+                  rows={4}
+                  className="input"
+                  placeholder="What should be improved in the protocol, materials, budget, or timeline?"
                 />
               </div>
-              <textarea
-                value={reviewText}
-                onChange={(event) => setReviewText(event.target.value)}
-                rows={4}
-                className="input"
-                placeholder="What should be improved in protocol, materials, budget, or timeline?"
-              />
+
               <div className="actions">
-                <button onClick={submitReview}>Submit Review</button>
+                <button
+                  className="btn-primary"
+                  onClick={submitReview}
+                  id="submit-review-btn"
+                >
+                  <span>Submit Review</span>
+                </button>
               </div>
-              {reviewStatus ? <p>{reviewStatus}</p> : null}
+
+              {reviewStatus && (
+                <div className={`review-status ${reviewStatus.type}`}>
+                  {reviewStatus.type === "success" ? "✓" : "✕"} {reviewStatus.message}
+                </div>
+              )}
             </section>
           </>
-        ) : null}
+        )}
       </main>
     </div>
   );
