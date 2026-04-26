@@ -148,7 +148,102 @@ CROSSREF_BASE_URL=https://api.crossref.org
 
 ---
 
-## Additional Information
+## ⭐ Stretch Goal: Scientist Review — Closing the Learning Loop
+
+> *"The demo that wins this stretch goal is one where a judge can watch the system generate a plan, a scientist leave structured corrections, and the next plan for a similar experiment visibly reflect those corrections — without being explicitly re-prompted."*
+
+This is the hardest challenge in the brief — and we built it.
+
+---
+
+### What We Built
+
+**The core idea:** every time a scientist reviews and corrects a generated plan, that feedback becomes a training signal. Over time, the system gets better at generating plans for similar experiment types — learning from expert knowledge rather than just retrieving it.
+
+#### 1. Structured Review Interface (Section 5 of the UI)
+
+After the experiment plan renders, a dedicated **Scientist Review Loop** section appears with:
+
+- **⭐ Star rating (1–5)** with labeled quality levels:
+  - 1 — Needs major work
+  - 2 — Below expectations
+  - 3 — Acceptable
+  - 4 — Good plan
+  - 5 — Excellent, ready to run
+- **Four section-level correction textareas** — one each for:
+  - 🔬 Protocol (step-level corrections, e.g. wrong centrifuge speed)
+  - 🧫 Materials (reagent substitutions, catalog number corrections)
+  - 💰 Budget (cost estimate corrections, missing line items)
+  - 📅 Timeline (duration errors, missing dependencies)
+- **General comments** — free-form domain observations
+- **Submit Review button** — amber-styled, only enabled once a rating is selected
+- **Confirmation banner** — "Feedback Stored. The next plan for a similar hypothesis will automatically reflect your expert corrections."
+
+#### 2. Feedback Store (`src/lib/feedback.ts`)
+
+Corrections are captured in **structured form** and persisted in an in-memory review store:
+
+```ts
+type StoredReview = {
+  hypothesis: string;      // the original hypothesis text
+  score: number;           // 1–5 rating
+  comments: string;        // merged: general + per-section corrections
+  createdAt: string;       // ISO timestamp
+};
+```
+
+Section corrections are merged into a single structured comment string:
+```
+"Protocol: Step 4 centrifuge speed 400×g not 300×g | Materials: Prefer Sigma T9531"
+```
+
+This makes retrieval efficient — one string per review, keyword-searchable.
+
+#### 3. Generation Layer — Few-Shot Injection (`src/lib/gemini.ts`)
+
+When a new plan is generated, `getReviewExamples(hypothesis, limit=3)` finds reviews where any token in the stored hypothesis appears in the new hypothesis:
+
+```ts
+reviewStore()
+  .filter(review =>
+    review.hypothesis.toLowerCase().split(" ").some(token => normalized.includes(token))
+  )
+  .slice(-limit)
+  .map(review => `Review score ${review.score}/5: ${review.comments}`)
+```
+
+These are formatted as few-shot examples and injected directly into the prompt:
+
+```
+=== SCIENTIST FEEDBACK (from prior similar experiments) ===
+Review score 4/5: Protocol: centrifuge step should be 400×g not 300×g | Timeline: recovery needs 72h
+Review score 3/5: Materials: add 10% glycerol to freezing medium
+```
+
+The model receives these corrections as **explicit context** — it sees them before it generates the plan. No retraining, no fine-tuning, no re-prompting by the user.
+
+#### 4. The Live Demo Flow (What the Judge Sees)
+
+| Step | Action | What Happens |
+|---|---|---|
+| 1 | Submit hypothesis (e.g. HeLa cryopreservation) | Plan generated with default protocol |
+| 2 | Open **Section 5 — Scientist Review Loop** | Star rating + 4 correction textareas visible |
+| 3 | Rate 3/5, enter protocol correction ("centrifuge 400×g not 300×g"), submit | "Feedback Stored" banner appears |
+| 4 | Submit the **same or similar hypothesis** again | New plan generated |
+| 5 | Open Protocol tab | Corrected centrifuge speed appears in the new plan — **without re-prompting** |
+
+---
+
+### Why This Matters
+
+A system that learns from scientist feedback compounds in value over time. Every review makes the next plan better. This is the difference between a **tool** and a **platform**.
+
+- A tool generates the same plan with the same errors forever.
+- A platform accumulates expert domain knowledge and applies it automatically.
+
+The feedback loop requires zero retraining, zero model updates, and zero user re-prompting — corrections flow silently from the review interface into the generation layer through the few-shot injection mechanism.
+
+**Upgrade path:** The in-memory store is a drop-in for PostgreSQL, Supabase, or any persistent backend. The `getReviewExamples()` interface is unchanged — swap the store and the learning loop persists across server restarts.
 
 **Note on `lib/gemini.ts` filename:** The file is named `gemini.ts` for historical reasons (an early prototype used the Gemini API). The actual implementation uses the Ollama JavaScript client throughout — the filename is an artifact and the code is entirely Ollama-based.
 

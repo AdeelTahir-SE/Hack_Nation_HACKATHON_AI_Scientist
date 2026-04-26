@@ -182,6 +182,33 @@ Pull the model used by the app (if not already done):
 ollama pull qwen2.5:7b
 ```
 
+### Supabase Setup (Scientist Review Loop)
+
+The feedback store is backed by Supabase so reviews persist across server restarts and team members.
+
+**Step 1 — Create a free Supabase project:** https://supabase.com → New Project
+
+**Step 2 — Run the table setup SQL:**
+- Open your Supabase project → SQL Editor → New Query
+- Paste the entire contents of `supabase_setup.sql` (included in this repo)
+- Click **Run** — this creates the `reviews` table with RLS policies
+
+**Step 3 — Add credentials to your `.env.local`:**
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+```
+
+Both values are at: **Supabase Dashboard → Settings → API**
+
+**What this enables:**
+- Reviews survive server restarts, `npm run dev` restarts, and Vercel cold starts
+- Multiple team members can leave reviews from different machines
+- The judge can see feedback from Plan 1 carry into Plan 2 even after a full restart
+
+> Without Supabase credentials set, the server will throw a clear error when the first review is submitted.
+
 ### Run Locally
 
 ```bash

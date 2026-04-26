@@ -45,11 +45,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const reviewExamples = getReviewExamples(hypothesis);
-    const retrievedEvidence = retrieveEvidence(
-      `${hypothesis}\n${literature.references.map((r) => r.title).join("\n")}\n${(literature.protocols || []).map((p) => p.title).join("\n")}`,
-      5,
-    );
+    const [reviewExamples, retrievedEvidence] = await Promise.all([
+      getReviewExamples(hypothesis),
+      Promise.resolve(
+        retrieveEvidence(
+          `${hypothesis}\n${literature.references.map((r) => r.title).join("\n")}\n${(literature.protocols || []).map((p) => p.title).join("\n")}`,
+          5,
+        )
+      ),
+    ]);
 
     const plan = await generateExperimentPlan({
       hypothesis,

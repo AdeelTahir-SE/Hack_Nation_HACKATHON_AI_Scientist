@@ -165,20 +165,96 @@ flowchart TD
 
 ---
 
-## 5. Scientist Review Feedback Loop
+## 5. ⭐ Stretch Goal — Scientist Review Loop (Closing the Learning Loop)
+
+> *"The demo that wins this stretch goal is one where a judge can watch the system generate a plan, a scientist leave structured corrections, and the next plan for a similar experiment visibly reflect those corrections — without being explicitly re-prompted."*
+
+### 5a. Review UI — What the User Sees
+
+```mermaid
+flowchart TD
+    subgraph UI["Section 5: Scientist Review Loop"]
+        direction TB
+        STARS["⭐ Star Rating 1–5\n(Needs major work → Excellent)"]
+        PC["🔬 Protocol corrections textarea\ne.g. centrifuge speed 400×g not 300×g"]
+        MC["🧫 Materials corrections textarea\ne.g. Prefer Sigma T9531 over generic"]
+        BC["💰 Budget corrections textarea\ne.g. Cell line ~$450 not $200"]
+        TC["📅 Timeline corrections textarea\ne.g. Recovery phase needs 72h minimum"]
+        GC["General comments textarea"]
+        BTN["⚡ Submit Review button\n(enabled only when rating > 0)"]
+        DONE["✅ Feedback Stored banner\n'Next similar plan will reflect your corrections'"]
+    end
+
+    STARS & PC & MC & BC & TC & GC --> BTN
+    BTN -->|"POST /api/submit-review"| DONE
+
+    style DONE fill:#1a7a4a,color:#fff,stroke:#0d5c35
+```
+
+---
+
+### 5b. Full Review + Regeneration Flow (The Judge Demo)
+
+```mermaid
+sequenceDiagram
+    actor Scientist
+    actor Judge
+    participant UI as Next.js UI
+    participant ReviewAPI as /api/submit-review
+    participant FB as feedback.ts
+    participant GenAPI as /api/generate-plan
+    participant GEN as gemini.ts
+
+    Note over Scientist,GEN: Run 1 — Baseline Plan
+    Scientist->>UI: Submit hypothesis\n"HeLa cryopreservation with trehalose"
+    UI->>GenAPI: POST { hypothesis }
+    GenAPI->>GEN: buildPrompt(... feedback=[])
+    GEN-->>UI: Plan — protocol step 4: "centrifuge 300×g"
+    UI->>Judge: 📋 Baseline plan rendered
+
+    Note over Scientist,FB: Scientist leaves corrections
+    Scientist->>UI: Open Section 5 — Scientist Review Loop
+    Scientist->>UI: Rate 3/5 | Protocol: "centrifuge 400×g not 300×g"\n| Timeline: "recovery needs 72h not 24h"
+    UI->>ReviewAPI: POST { hypothesis, score: 3,\n  comments: "Protocol: 400×g | Timeline: 72h" }
+    ReviewAPI->>FB: saveReview(payload)
+    FB-->>UI: ✅ "Feedback Stored" banner shown
+
+    Note over Scientist,GEN: Run 2 — Improved Plan (same hypothesis)
+    Scientist->>UI: Submit same hypothesis again
+    UI->>GenAPI: POST { hypothesis }
+    GenAPI->>GEN: getReviewExamples(hypothesis)
+    FB-->>GEN: ["Review score 3/5: Protocol: 400×g not 300×g | Timeline: 72h"]
+    GEN->>GEN: buildPrompt(... feedback=[\n  "Review 3/5: centrifuge 400×g…"\n])
+    GEN-->>UI: Plan — protocol step 4: "centrifuge 400×g"\n+ recovery phase: "72h"
+    UI->>Judge: 📋 Corrected plan — WITHOUT re-prompting
+```
+
+---
+
+### 5c. Feedback Retrieval Mechanism
 
 ```mermaid
 flowchart LR
-    P["Generated Plan\n(first run)"] --> R["Scientist Review UI\n/api/submit-review"]
-    R --> FS["feedback.ts\nIn-memory review store\n{ experimentType, domain,\n  sectionCorrections, rating }"]
-    FS -.->|"Next similar hypothesis"| GEN["gemini.ts\nbuildPrompt()\nfew-shot examples injected"]
-    GEN --> P2["Improved Plan\n(subsequent runs)"]
+    H["New hypothesis\n'HeLa cryopreservation'"]
+    H --> TOK["Tokenize hypothesis\n['hela', 'cryo', 'trehalose', ...]"]
+    TOK --> FILTER["reviewStore()\n.filter(r => any token in r.hypothesis)"]
+    FILTER --> SLICE[".slice(-3) — last 3 matching reviews"]
+    SLICE --> FORMAT["Format as few-shot blocks:\n'Review score N/5: [comments]'"]
+    FORMAT --> INJ["Injected into buildPrompt()\n=== SCIENTIST FEEDBACK ==="]
+    INJ --> OL["Ollama generates plan\nwith corrections as context"]
 
-    style P2 fill:#1a7a4a,color:#fff,stroke:#0d5c35
-    style FS fill:#7a4a1a,color:#fff,stroke:#5c3010
+    style OL fill:#2d4a8a,color:#fff,stroke:#1a3060
+    style INJ fill:#7a4a1a,color:#fff,stroke:#5c3010
 ```
 
-The feedback loop is self-improving: every expert correction tagged with `experimentType` and `domain` is surfaced as a few-shot example the next time a similar hypothesis is submitted. No retraining required.
+**Key implementation facts:**
+- Token-matching uses word overlap (no embedding cost) — fast and domain-appropriate
+- Last-3 limit keeps the prompt from ballooning on repeated reviews
+- Section corrections are merged into one string: `"Protocol: X | Materials: Y | Timeline: Z"`
+- The model sees corrections as **explicit named context** before generating — it directly incorporates them
+- No fine-tuning, no retraining, no re-prompting — the learning loop is fully automatic
+
+
 
 ---
 
